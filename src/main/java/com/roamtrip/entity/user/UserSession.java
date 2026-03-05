@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_user_session_expires_at", columnList = "expires_at")
         }
 )
-public class UserSession extends BaseEntity {
+public class    UserSession extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)

@@ -1,6 +1,7 @@
 package com.roamtrip.config;
 
 import com.roamtrip.security.UserIdPrincipal;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
@@ -12,11 +13,13 @@ import java.util.Optional;
 
 @Configuration
 @EnableJpaAuditing(auditorAwareRef = "auditorAware")
+@Slf4j
 public class JpaAuditingConfig {
 
     @Bean
     public AuditorAware<Long> auditorAware() {
         return () -> {
+            log.debug("In security context: hehe");
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || !authentication.isAuthenticated()) {
                 return Optional.empty();
