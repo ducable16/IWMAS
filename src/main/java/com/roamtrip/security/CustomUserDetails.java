@@ -1,7 +1,6 @@
-package com.roamtrip.utils;
+package com.roamtrip.security;
 
-import com.roamtrip.security.UserIdPrincipal;
-import com.roamtrip.entity.user.User;
+import com.roamtrip.user.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

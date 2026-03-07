@@ -1,7 +1,7 @@
 package com.roamtrip.tenant;
 
-import com.roamtrip.entity.issue.Issue;
-import com.roamtrip.entity.project.Project;
+import com.roamtrip.issue.entity.Issue;
+import com.roamtrip.project.entity.Project;
 
 /**
  * Small enforcement hook for service layer:

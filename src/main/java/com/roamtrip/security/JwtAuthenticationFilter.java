@@ -1,8 +1,6 @@
 package com.roamtrip.security;
 
-import com.roamtrip.utils.CustomUserDetails;
-import com.roamtrip.utils.CustomUserDetailsService;
-import com.roamtrip.utils.JwtUtils;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,7 +18,7 @@ import java.io.IOException;
 @AllArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private JwtUtils jwtUtils;
+    private JwtService jwtService;
 
     private CustomUserDetailsService userDetailsService;
 
@@ -39,13 +37,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String username = jwtUtils.extractEmail(token);
+        if (!jwtService.isTokenValid(token)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        Claims claims = jwtService.parseClaims(token);
+        String username = claims.getSubject();
+        Long sessionId = claims.get("sessionId", Long.class);
+        String type = claims.get("type", String.class);
+
+        if (!"access".equals(type)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(username);
-
-            if (jwtUtils.validateToken(token)) {
+            userDetails = CustomUserDetails.builder()
+                    .user(userDetails.getUser())
+                    .sessionId(sessionId)
+                    .build();
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
@@ -59,7 +71,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
         }
 
         filterChain.doFilter(request, response);
