@@ -1,6 +1,6 @@
 package com.roamtrip.repository.project;
 
-import com.roamtrip.entity.project.Project;
+import com.roamtrip.project.entity.Project;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

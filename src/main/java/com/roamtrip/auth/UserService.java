@@ -2,11 +2,11 @@ package com.roamtrip.auth;
 
 import com.roamtrip.auth.dto.ChangePasswordRequest;
 import com.roamtrip.auth.dto.UpdateProfileRequest;
-import com.roamtrip.auth.dto.UserMeResponse;
-import com.roamtrip.entity.enums.ErrorCode;
-import com.roamtrip.entity.user.User;
-import com.roamtrip.exception.AppException;
-import com.roamtrip.repository.UserRepository;
+import com.roamtrip.user.dto.UserMeResponse;
+import com.roamtrip.common.enums.ErrorCode;
+import com.roamtrip.user.entity.User;
+import com.roamtrip.common.exception.AppException;
+import com.roamtrip.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
