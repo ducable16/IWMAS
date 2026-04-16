@@ -6,6 +6,8 @@ import com.roamtrip.auth.dto.LoginRequest;
 import com.roamtrip.auth.dto.RefreshTokenRequest;
 import com.roamtrip.auth.dto.RegisterRequest;
 import com.roamtrip.auth.dto.ResetPasswordRequest;
+import com.roamtrip.auth.dto.SendOtpRequest;
+import com.roamtrip.auth.dto.VerifyOtpRequest;
 import com.roamtrip.security.AuthenticatedUserResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +60,16 @@ public class AuthController {
     public ResponseEntity<String> logout() {
         authService.logout(authenticatedUserResolver.currentSessionId());
         return ResponseEntity.ok("Logged out");
+    }
+
+    @PostMapping("/send-otp")
+    public ResponseEntity<String> sendOtp(@Valid @RequestBody SendOtpRequest request) {
+        return ResponseEntity.ok(authService.sendOtp(request));
+    }
+
+    @PostMapping("/verify-email-otp")
+    public ResponseEntity<String> verifyEmailOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        return ResponseEntity.ok(authService.verifyEmailOtp(request));
     }
 
     @PostMapping("/forgot-password")

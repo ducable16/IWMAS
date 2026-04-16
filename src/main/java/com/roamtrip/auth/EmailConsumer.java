@@ -27,10 +27,14 @@ public class EmailConsumer {
     public void consume(EmailMessage message) {
         try {
             Context context = new Context();
-            String path = "email-verification".equals(message.getTemplate())
-                    ? "/verify-email?token=" + message.getToken()
-                    : "/reset-password?token=" + message.getToken();
-            context.setVariable("actionUrl", frontendBaseUrl + path);
+            if ("email-otp".equals(message.getTemplate())) {
+                context.setVariable("otp", message.getToken());
+            } else {
+                String path = "email-verification".equals(message.getTemplate())
+                        ? "/verify-email?token=" + message.getToken()
+                        : "/reset-password?token=" + message.getToken();
+                context.setVariable("actionUrl", frontendBaseUrl + path);
+            }
 
             String htmlBody = templateEngine.process(message.getTemplate(), context);
             MimeMessage mime = mailSender.createMimeMessage();

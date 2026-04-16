@@ -5,8 +5,11 @@ import com.roamtrip.auth.dto.UpdateProfileRequest;
 import com.roamtrip.auth.AuthService;
 import com.roamtrip.common.enums.ErrorCode;
 import com.roamtrip.common.exception.AppException;
+import com.roamtrip.user.dto.CreateUserRequest;
+import com.roamtrip.user.dto.UpdateUserRequest;
 import com.roamtrip.user.dto.UserMeResponse;
 import com.roamtrip.user.entity.User;
+import com.roamtrip.user.enums.UserRole;
 import com.roamtrip.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,6 +49,60 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
         return "Password changed";
+    }
+
+    @Transactional
+    public UserMeResponse createUser(CreateUserRequest request) {
+        userRepository.findByEmail(request.getEmail().trim().toLowerCase())
+                .ifPresent(u -> { throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS); });
+
+        User user = new User();
+        user.setEmail(request.getEmail().trim().toLowerCase());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName().trim());
+        user.setIsVerified(true);
+        user.setRole(request.getRole() != null ? request.getRole() : UserRole.TEAM_MEMBER);
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            user.setUsername(request.getUsername().trim());
+        }
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            user.setPhone(request.getPhone().trim());
+        }
+        if (request.getDepartmentId() != null) {
+            user.setDepartmentId(request.getDepartmentId());
+        }
+        if (request.getPosition() != null && !request.getPosition().isBlank()) {
+            user.setPosition(request.getPosition().trim());
+        }
+        return authService.toMeResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserMeResponse updateUser(Long targetUserId, UpdateUserRequest request, String callerRole) {
+        User user = findUser(targetUserId);
+
+        if (request.getRole() != null && !"ADMIN".equals(callerRole)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED, "Only ADMIN can change user roles");
+        }
+        if (request.getFullName() != null && !request.getFullName().isBlank()) {
+            user.setFullName(request.getFullName().trim());
+        }
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            user.setUsername(request.getUsername().trim());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone().isBlank() ? null : request.getPhone().trim());
+        }
+        if (request.getDepartmentId() != null) {
+            user.setDepartmentId(request.getDepartmentId());
+        }
+        if (request.getPosition() != null) {
+            user.setPosition(request.getPosition().isBlank() ? null : request.getPosition().trim());
+        }
+        if (request.getRole() != null) {
+            user.setRole(request.getRole());
+        }
+        return authService.toMeResponse(userRepository.save(user));
     }
 
     public List<UserMeResponse> getAllUsers() {

@@ -3,6 +3,8 @@ package com.roamtrip.user.controller;
 import com.roamtrip.auth.dto.ChangePasswordRequest;
 import com.roamtrip.auth.dto.UpdateProfileRequest;
 import com.roamtrip.security.AuthenticatedUserResolver;
+import com.roamtrip.user.dto.CreateUserRequest;
+import com.roamtrip.user.dto.UpdateUserRequest;
 import com.roamtrip.user.dto.UserMeResponse;
 import com.roamtrip.user.service.UserService;
 import jakarta.validation.Valid;
@@ -34,6 +36,19 @@ public class UserController {
     @PostMapping("/me/password")
     public ResponseEntity<String> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         return ResponseEntity.ok(userService.changePassword(authenticatedUserResolver.currentUserId(), request));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserMeResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
+        return ResponseEntity.status(201).body(userService.createUser(request));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
+    public ResponseEntity<UserMeResponse> updateUser(@PathVariable Long id,
+                                                     @Valid @RequestBody UpdateUserRequest request) {
+        return ResponseEntity.ok(userService.updateUser(id, request, authenticatedUserResolver.currentUserRole()));
     }
 
     @GetMapping

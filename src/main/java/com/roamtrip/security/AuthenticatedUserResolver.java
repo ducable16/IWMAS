@@ -25,6 +25,17 @@ public class AuthenticatedUserResolver {
         throw new AppException(ErrorCode.UNAUTHENTICATED);
     }
 
+    public String currentUserRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return authentication.getAuthorities().stream()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .findFirst()
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+    }
+
     private Object principal() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

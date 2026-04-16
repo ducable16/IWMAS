@@ -6,14 +6,18 @@ import com.roamtrip.auth.dto.LoginRequest;
 import com.roamtrip.auth.dto.RefreshTokenRequest;
 import com.roamtrip.auth.dto.RegisterRequest;
 import com.roamtrip.auth.dto.ResetPasswordRequest;
+import com.roamtrip.auth.dto.SendOtpRequest;
+import com.roamtrip.auth.dto.VerifyOtpRequest;
 import com.roamtrip.user.dto.UserMeResponse;
 import com.roamtrip.common.enums.ErrorCode;
 import com.roamtrip.auth.entity.EmailVerification;
+import com.roamtrip.auth.entity.OtpVerification;
 import com.roamtrip.auth.entity.PasswordReset;
 import com.roamtrip.user.entity.User;
 import com.roamtrip.user.entity.UserSession;
 import com.roamtrip.common.exception.AppException;
 import com.roamtrip.auth.repository.EmailVerificationRepository;
+import com.roamtrip.auth.repository.OtpVerificationRepository;
 import com.roamtrip.auth.repository.PasswordResetRepository;
 import com.roamtrip.user.repository.UserRepository;
 import com.roamtrip.user.repository.UserSessionRepository;
@@ -24,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -33,12 +38,17 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final EmailVerificationRepository emailVerificationRepository;
+    private final OtpVerificationRepository otpVerificationRepository;
     private final PasswordResetRepository passwordResetRepository;
     private final UserSessionRepository userSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenHashingService tokenHashingService;
     private final EmailNotificationProducer emailNotificationProducer;
     private final JwtService jwtService;
+
+    private static final int OTP_MAX_ATTEMPTS = 5;
+    private static final int OTP_EXPIRY_MINUTES = 5;
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
     public String register(RegisterRequest request) {
@@ -206,6 +216,63 @@ public class AuthService {
         reset.setUsedAt(LocalDateTime.now());
         passwordResetRepository.save(reset);
         return "Password reset successful";
+    }
+
+    @Transactional
+    public String sendOtp(SendOtpRequest request) {
+        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        otpVerificationRepository.deleteByUser(user);
+
+        String rawOtp = String.format("%06d", secureRandom.nextInt(1_000_000));
+        OtpVerification otpVerification = new OtpVerification();
+        otpVerification.setUser(user);
+        otpVerification.setOtpHash(tokenHashingService.sha256(rawOtp));
+        otpVerification.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
+        otpVerificationRepository.save(otpVerification);
+
+        emailNotificationProducer.publish(EmailMessage.builder()
+                .to(user.getEmail())
+                .subject("Your Workforce verification code")
+                .template("email-otp")
+                .token(rawOtp)
+                .build());
+
+        return "OTP has been sent to your email";
+    }
+
+    @Transactional
+    public String verifyEmailOtp(VerifyOtpRequest request) {
+        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        OtpVerification otpRecord = otpVerificationRepository
+                .findTopByUserOrderByCreatedAtDesc(user)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_OTP));
+
+        if (otpRecord.getVerifiedAt() != null) {
+            throw new AppException(ErrorCode.INVALID_OTP);
+        }
+        if (otpRecord.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
+        if (otpRecord.getAttemptCount() >= OTP_MAX_ATTEMPTS) {
+            throw new AppException(ErrorCode.OTP_EXPIRED, "OTP invalidated after too many failed attempts");
+        }
+        if (!otpRecord.getOtpHash().equals(tokenHashingService.sha256(request.getOtp()))) {
+            otpRecord.setAttemptCount(otpRecord.getAttemptCount() + 1);
+            otpVerificationRepository.save(otpRecord);
+            throw new AppException(ErrorCode.OTP_INCORRECT);
+        }
+
+        otpRecord.setVerifiedAt(LocalDateTime.now());
+        otpVerificationRepository.save(otpRecord);
+
+        user.setIsVerified(true);
+        userRepository.save(user);
+
+        return "Email verified successfully";
     }
 
     public UserMeResponse toMeResponse(User user) {
