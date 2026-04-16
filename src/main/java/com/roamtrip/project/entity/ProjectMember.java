@@ -1,11 +1,12 @@
 package com.roamtrip.project.entity;
 
 import com.roamtrip.common.entity.BaseEntity;
-import com.roamtrip.project.enums.ProjectRole;
-import com.roamtrip.user.entity.User;
+import com.roamtrip.project.enums.ProjectRoleInProject;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -16,21 +17,31 @@ import lombok.Setter;
                 @UniqueConstraint(name = "uq_project_member", columnNames = {"project_id", "user_id"})
         },
         indexes = {
-                @Index(name = "idx_project_member_project", columnList = "project_id"),
-                @Index(name = "idx_project_member_user", columnList = "user_id")
+                @Index(name = "idx_pm_project", columnList = "project_id"),
+                @Index(name = "idx_pm_user", columnList = "user_id")
         }
 )
 public class ProjectMember extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "project_id", nullable = false)
-    private Project project;
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, length = 32)
-    private ProjectRole role;
+    @Column(name = "role_in_project", nullable = false, length = 50)
+    private ProjectRoleInProject roleInProject = ProjectRoleInProject.MEMBER;
+
+    @Column(name = "allocated_effort_percent")
+    private Integer allocatedEffortPercent;
+
+    @Column(name = "join_date")
+    private LocalDate joinDate;
+
+    @Column(name = "leave_date")
+    private LocalDate leaveDate;
+
+    @Column(name = "note", columnDefinition = "TEXT")
+    private String note;
 }

@@ -1,16 +1,13 @@
 package com.roamtrip.notification.entity;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.roamtrip.common.entity.BaseEntity;
-import com.roamtrip.notification.enums.NotificationChannel;
-import com.roamtrip.notification.enums.NotificationStatus;
 import com.roamtrip.notification.enums.NotificationType;
-import com.roamtrip.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -18,29 +15,44 @@ import org.hibernate.type.SqlTypes;
 @Table(
         name = "notifications",
         indexes = {
-                @Index(name = "idx_notification_recipient_created_at", columnList = "recipient_id,created_at"),
-                @Index(name = "idx_notification_recipient_status_created_at", columnList = "recipient_id,status,created_at")
+                @Index(name = "idx_notification_recipient", columnList = "recipient_id"),
+                @Index(name = "idx_notification_created_at", columnList = "created_at"),
+                @Index(name = "idx_notification_is_read", columnList = "recipient_id, is_read")
         }
 )
-public class Notification extends BaseEntity {
+@EntityListeners(AuditingEntityListener.class)
+public class Notification {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recipient_id", nullable = false)
-    private User recipient;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "recipient_id", nullable = false)
+    private Long recipientId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false, length = 32)
+    @Column(name = "type", nullable = false, length = 100)
     private NotificationType type;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "channel", nullable = false, length = 32)
-    private NotificationChannel channel = NotificationChannel.IN_APP;
+    @Column(name = "title", nullable = false, length = 300)
+    private String title;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 32)
-    private NotificationStatus status = NotificationStatus.UNREAD;
+    @Column(name = "content", columnDefinition = "TEXT")
+    private String content;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "payload", columnDefinition = "jsonb")
-    private JsonNode payload;
+    @Column(name = "reference_type", length = 50)
+    private String referenceType;
+
+    @Column(name = "reference_id")
+    private Long referenceId;
+
+    @Column(name = "is_read", nullable = false)
+    private Boolean isRead = false;
+
+    @Column(name = "read_at")
+    private LocalDateTime readAt;
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 }

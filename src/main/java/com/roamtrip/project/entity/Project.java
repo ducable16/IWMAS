@@ -1,11 +1,13 @@
 package com.roamtrip.project.entity;
 
 import com.roamtrip.common.entity.BaseEntity;
-import com.roamtrip.organization.entity.Organization;
-import com.roamtrip.project.enums.ProjectVisibility;
+import com.roamtrip.project.enums.ProjectPriority;
+import com.roamtrip.project.enums.ProjectStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -13,25 +15,41 @@ import lombok.Setter;
 @Table(
         name = "projects",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uq_project_key_per_org", columnNames = {"org_id", "key"})
+                @UniqueConstraint(name = "uq_project_code", columnNames = {"code"})
         },
         indexes = {
-                @Index(name = "idx_project_org", columnList = "org_id")
+                @Index(name = "idx_project_manager", columnList = "manager_id"),
+                @Index(name = "idx_project_status", columnList = "status")
         }
 )
 public class Project extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "org_id", nullable = false)
-    private Organization organization;
-
-    @Column(name = "key", nullable = false, length = 32)
-    private String key;
-
-    @Column(name = "name", nullable = false, length = 255)
+    @Column(name = "name", nullable = false, length = 200)
     private String name;
 
+    @Column(name = "code", unique = true, length = 50)
+    private String code;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "visibility", nullable = false, length = 32)
-    private ProjectVisibility visibility = ProjectVisibility.PRIVATE;
+    @Column(name = "status", nullable = false, length = 50)
+    private ProjectStatus status = ProjectStatus.PLANNING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority", length = 20)
+    private ProjectPriority priority = ProjectPriority.MEDIUM;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    @Column(name = "actual_end_date")
+    private LocalDate actualEndDate;
+
+    @Column(name = "manager_id", nullable = false)
+    private Long managerId;
 }

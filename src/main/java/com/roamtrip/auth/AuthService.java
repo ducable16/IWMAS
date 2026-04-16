@@ -51,7 +51,7 @@ public class AuthService {
         user.setEmail(request.getEmail().trim().toLowerCase());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getName().trim());
-        user.setIsActive(false);
+        user.setIsVerified(false);
         user = userRepository.save(user);
 
         String rawToken = UUID.randomUUID().toString();
@@ -64,12 +64,12 @@ public class AuthService {
 
         emailNotificationProducer.publish(EmailMessage.builder()
                 .to(user.getEmail())
-                .subject("Verify your Roamtrip account")
+                .subject("Verify your Workforce account")
                 .template("email-verification")
                 .token(rawToken)
                 .build());
 
-        return "Kiem tra email de xac thuc tai khoan";
+        return "Check your email to verify your account";
     }
 
     @Transactional
@@ -84,7 +84,7 @@ public class AuthService {
 
         verification.setVerifiedAt(LocalDateTime.now());
         User user = verification.getUser();
-        user.setIsActive(true);
+        user.setIsVerified(true);
         userRepository.save(user);
         emailVerificationRepository.save(verification);
     }
@@ -94,12 +94,18 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        if (!Boolean.TRUE.equals(user.getIsVerified())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED, "Email not verified. Please check your inbox.");
+        }
         if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new AppException(ErrorCode.UNAUTHORIZED, "Account is not active");
+            throw new AppException(ErrorCode.UNAUTHORIZED, "Account is deactivated. Contact your administrator.");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new AppException(ErrorCode.WRONG_PASSWORD);
         }
+
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
 
         UserSession session = new UserSession();
         session.setUser(user);
@@ -112,7 +118,7 @@ public class AuthService {
         session.setTokenLast4(refreshToken.substring(Math.max(0, refreshToken.length() - 4)));
         userSessionRepository.save(session);
 
-        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), session.getId());
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name(), session.getId());
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -141,7 +147,7 @@ public class AuthService {
         }
 
         User user = session.getUser();
-        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), session.getId());
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name(), session.getId());
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(request.getRefreshToken())
@@ -174,7 +180,7 @@ public class AuthService {
 
             emailNotificationProducer.publish(EmailMessage.builder()
                     .to(user.getEmail())
-                    .subject("Reset your Roamtrip password")
+                    .subject("Reset your Workforce password")
                     .template("password-reset")
                     .token(rawToken)
                     .build());
@@ -202,11 +208,18 @@ public class AuthService {
         return "Password reset successful";
     }
 
-    private UserMeResponse toMeResponse(User user) {
+    public UserMeResponse toMeResponse(User user) {
         return UserMeResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .name(user.getFullName())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .departmentId(user.getDepartmentId())
+                .position(user.getPosition())
+                .role(user.getRole())
+                .verified(user.getIsVerified())
                 .active(user.getIsActive())
                 .build();
     }

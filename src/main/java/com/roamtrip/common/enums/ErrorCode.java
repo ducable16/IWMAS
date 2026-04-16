@@ -12,40 +12,55 @@ public enum ErrorCode {
 
     // --- 9xxx: System & Defaults ---
     UPLOAD_FAILED(9997, "Upload failed", HttpStatus.INTERNAL_SERVER_ERROR),
-    URL_NOT_FOUND(9998, "URL not found", HttpStatus.INTERNAL_SERVER_ERROR),
+    URL_NOT_FOUND(9998, "URL not found", HttpStatus.NOT_FOUND),
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_KEY(1001, "Invalid error key", HttpStatus.BAD_REQUEST),
 
-    // --- 1xxx: User & Auth ---
+    // --- 1xxx: Auth & User ---
     USER_EXISTED(1002, "User already exists", HttpStatus.CONFLICT),
     USERNAME_INVALID(1003, "Username must be at least 3 characters", HttpStatus.BAD_REQUEST),
     USERNAME_ALREADY_EXISTS(1004, "Username already exists", HttpStatus.CONFLICT),
-    EMAIL_ALREADY_EXISTS(10041, "Email already exists", HttpStatus.CONFLICT),
-    PASSWORD_INVALID(1005, "Password must be at least 8 characters", HttpStatus.BAD_REQUEST),
-    WRONG_PASSWORD(1006, "Incorrect password", HttpStatus.BAD_REQUEST),
-    USER_NOT_FOUND(1007, "User not found", HttpStatus.NOT_FOUND),
-    UNAUTHENTICATED(1008, "Unauthenticated", HttpStatus.UNAUTHORIZED),
-    UNAUTHORIZED(1009, "You do not have permission", HttpStatus.FORBIDDEN),
-    INVALID_OTP(1010, "Invalid or expired OTP", HttpStatus.BAD_REQUEST),
-    INVALID_INPUT(1011, "Invalid input", HttpStatus.BAD_REQUEST),
-    INVALID_FORMAT(1012, "Invalid JSON format", HttpStatus.BAD_REQUEST),
-    OTP_INCORRECT(1013, "OTP incorrect", HttpStatus.BAD_REQUEST),
-    OTP_EXPIRED(1013, "OTP expired", HttpStatus.BAD_REQUEST),
+    EMAIL_ALREADY_EXISTS(1005, "Email already exists", HttpStatus.CONFLICT),
+    PASSWORD_INVALID(1006, "Password must be at least 8 characters", HttpStatus.BAD_REQUEST),
+    WRONG_PASSWORD(1007, "Incorrect password", HttpStatus.BAD_REQUEST),
+    USER_NOT_FOUND(1008, "User not found", HttpStatus.NOT_FOUND),
+    UNAUTHENTICATED(1009, "Unauthenticated", HttpStatus.UNAUTHORIZED),
+    UNAUTHORIZED(1010, "You do not have permission", HttpStatus.FORBIDDEN),
+    INVALID_OTP(1011, "Invalid or expired OTP", HttpStatus.BAD_REQUEST),
+    INVALID_INPUT(1012, "Invalid input", HttpStatus.BAD_REQUEST),
+    INVALID_FORMAT(1013, "Invalid JSON format", HttpStatus.BAD_REQUEST),
+    OTP_INCORRECT(1014, "OTP incorrect", HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(1015, "OTP expired", HttpStatus.BAD_REQUEST),
 
-    // --- 2xxx: Book/Domain ---
-    BOOK_NOT_FOUND(2001, "Book not found", HttpStatus.NOT_FOUND),
-    CATEGORY_NOT_FOUND(2002, "Category not found", HttpStatus.NOT_FOUND),
-    AUTHOR_NOT_FOUND(2003, "Author not found", HttpStatus.NOT_FOUND),
-    CHAPTER_NOT_FOUND(2004, "Chapter not found", HttpStatus.NOT_FOUND),
-    BOOK_ALREADY_EXISTS(2011, "Book already exists", HttpStatus.CONFLICT),
-    CATEGORY_ALREADY_EXISTS(2012, "Category already exists", HttpStatus.CONFLICT),
-    SLUG_ALREADY_EXISTS(2013, "Slug already exists", HttpStatus.CONFLICT),
-    COMMENT_NOT_FOUND(2014, "Comment not found", HttpStatus.NOT_FOUND),
-    PARENT_COMMENT_NOT_FOUND(2015, "Parent comment not found", HttpStatus.NOT_FOUND),
-    HISTORY_NOT_FOUND(2016, "Reading history not found", HttpStatus.NOT_FOUND),
-    SAVED_BOOK_NOT_FOUND(2017, "Saved book not found", HttpStatus.NOT_FOUND),
-    BOOK_ALREADY_SAVED(2018, "Book already saved", HttpStatus.CONFLICT),
+    // --- 2xxx: Department ---
+    DEPARTMENT_NOT_FOUND(2001, "Department not found", HttpStatus.NOT_FOUND),
+    DEPARTMENT_ALREADY_EXISTS(2002, "Department already exists", HttpStatus.CONFLICT),
 
+    // --- 3xxx: Skills ---
+    SKILL_NOT_FOUND(3001, "Skill not found", HttpStatus.NOT_FOUND),
+    SKILL_ALREADY_EXISTS(3002, "Skill already exists", HttpStatus.CONFLICT),
+    EMPLOYEE_SKILL_NOT_FOUND(3003, "Employee skill not found", HttpStatus.NOT_FOUND),
+    EMPLOYEE_SKILL_ALREADY_EXISTS(3004, "Employee already has this skill", HttpStatus.CONFLICT),
+
+    // --- 4xxx: Projects ---
+    PROJECT_NOT_FOUND(4001, "Project not found", HttpStatus.NOT_FOUND),
+    PROJECT_CODE_ALREADY_EXISTS(4002, "Project code already exists", HttpStatus.CONFLICT),
+    PROJECT_MEMBER_NOT_FOUND(4003, "Project member not found", HttpStatus.NOT_FOUND),
+    PROJECT_MEMBER_ALREADY_EXISTS(4004, "User is already a member of this project", HttpStatus.CONFLICT),
+
+    // --- 5xxx: Tasks ---
+    TASK_NOT_FOUND(5001, "Task not found", HttpStatus.NOT_FOUND),
+    TASK_INVALID_STATUS_TRANSITION(5002, "Invalid task status transition", HttpStatus.BAD_REQUEST),
+
+    // --- 6xxx: Time Logs ---
+    TIME_LOG_NOT_FOUND(6001, "Time log not found", HttpStatus.NOT_FOUND),
+    TIME_LOG_ALREADY_EXISTS(6002, "Time log already exists for this task/user/date", HttpStatus.CONFLICT),
+
+    // --- 7xxx: Notifications ---
+    NOTIFICATION_NOT_FOUND(7001, "Notification not found", HttpStatus.NOT_FOUND),
+
+    // --- 8xxx: Workload ---
+    WORKLOAD_SNAPSHOT_NOT_FOUND(8001, "Workload snapshot not found", HttpStatus.NOT_FOUND),
     ;
 
     private final int code;

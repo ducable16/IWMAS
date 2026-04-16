@@ -1,0 +1,300 @@
+// ================================================================
+// Users & Departments
+// ================================================================
+
+Table users {
+  id bigserial [pk, note: 'Primary key']
+  username varchar(100) [unique, not null, note: 'Login username']
+  password_hash varchar(255) [not null, note: 'Hashed password']
+  email varchar(100) [unique, not null, note: 'Email address']
+  full_name varchar(100) [not null, note: 'Full name']
+  phone varchar(20) [note: 'Phone number']
+  avatar_url varchar(500) [note: 'Profile picture']
+  department_id bigint [note: 'FK to departments']
+  position varchar(100) [note: 'Job position / title']
+  role varchar(50) [not null, default: 'TEAM_MEMBER', note: 'ADMIN, HR, PROJECT_MANAGER, TEAM_MEMBER']
+  is_verified boolean [default: false, note: 'Whether email has been verified']
+  last_login_at timestamp [note: 'Last login time']
+  is_active boolean [default: true, note: 'Currently employed or resigned']
+  is_deleted boolean [default: false, note: 'Soft delete']
+  created_at timestamp [not null, default: `now()`, note: 'Creation time']
+  created_by bigint [note: 'Created by']
+  updated_at timestamp [note: 'Last update time']
+  updated_by bigint [note: 'Updated by']
+}
+
+Table departments {
+  id bigserial [pk, note: 'Primary key']
+  name varchar(100) [not null, note: 'Department name']
+  description text [note: 'Department description']
+  manager_id bigint [note: 'FK to users — Department manager']
+  is_deleted boolean [default: false, note: 'Soft delete']
+  created_at timestamp [not null, default: `now()`, note: 'Creation time']
+  created_by bigint [note: 'Created by']
+  updated_at timestamp [note: 'Last update time']
+  updated_by bigint [note: 'Updated by']
+}
+
+// ================================================================
+// Skills
+// ================================================================
+
+Table skills {
+  id bigserial [pk, note: 'Primary key']
+  name varchar(100) [not null, note: 'Skill name (Java, React, Testing, Design...)']
+  category varchar(100) [note: 'Skill category (Backend, Frontend, DevOps, Soft skill...)']
+  description text [note: 'Skill description']
+  is_deleted boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+  updated_at timestamp
+  updated_by bigint
+}
+
+Table employee_skills {
+  id bigserial [pk, note: 'Primary key']
+  user_id bigint [not null, note: 'Employee']
+  skill_id bigint [not null, note: 'Skill']
+  level varchar(20) [not null, note: 'Proficiency level: BEGINNER / INTERMEDIATE / ADVANCED / EXPERT']
+  years_of_experience decimal(4,1) [note: 'Years of experience with this skill']
+  note text [note: 'Additional notes (e.g. used in project X)']
+  is_deleted boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+  updated_at timestamp
+  updated_by bigint
+
+  indexes {
+    (user_id, skill_id) [unique, note: 'Each employee can only have one record per skill']
+  }
+}
+
+// ================================================================
+// Projects
+// ================================================================
+
+Table projects {
+  id bigserial [pk, note: 'Primary key']
+  name varchar(200) [not null, note: 'Project name']
+  code varchar(50) [unique, note: 'Project code']
+  description text [note: 'Project description']
+  status varchar(50) [not null, default: 'PLANNING', note: 'Status: PLANNING / IN_PROGRESS / ON_HOLD / COMPLETED / CANCELLED']
+  priority varchar(20) [default: 'MEDIUM', note: 'Priority: LOW / MEDIUM / HIGH / CRITICAL']
+  start_date date [note: 'Planned start date']
+  end_date date [note: 'Planned end date']
+  actual_end_date date [note: 'Actual end date']
+  manager_id bigint [not null, note: 'Project Manager']
+  is_deleted boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+  updated_at timestamp
+  updated_by bigint
+}
+
+Table project_members {
+  id bigserial [pk, note: 'Primary key']
+  project_id bigint [not null, note: 'Project']
+  user_id bigint [not null, note: 'Participating employee']
+  role_in_project varchar(50) [not null, default: 'MEMBER', note: 'Role in project: LEAD / MEMBER / SUPPORTER']
+  allocated_effort_percent int [note: 'Percentage of time allocated to this project (e.g. 50 = 50% of time)']
+  join_date date [note: 'Date joined the project']
+  leave_date date [note: 'Date left the project (if applicable)']
+  note text [note: 'Notes on role and responsibilities']
+  is_deleted boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+  updated_at timestamp
+  updated_by bigint
+
+  indexes {
+    (project_id, user_id) [unique, note: 'Each person can only join a project once']
+  }
+}
+
+// ================================================================
+// Tasks
+// ================================================================
+
+Table tasks {
+  id bigserial [pk, note: 'Primary key']
+  project_id bigint [not null, note: 'Belongs to which project']
+  title varchar(300) [not null, note: 'Task title']
+  description text [note: 'Detailed description of the work to be done']
+  type varchar(50) [not null, default: 'FEATURE', note: 'Type: FEATURE / BUG / RESEARCH / TESTING / DOCUMENTATION']
+  status varchar(50) [not null, default: 'TODO', note: 'Status: TODO / IN_PROGRESS / IN_REVIEW / DONE / CANCELLED']
+  priority varchar(20) [not null, default: 'MEDIUM', note: 'Priority: LOW / MEDIUM / HIGH / CRITICAL']
+  estimated_hours decimal(6,1) [note: 'Estimated hours to complete']
+  actual_hours decimal(6,1) [note: 'Actual hours worked (aggregated from time_logs)']
+  start_date date [note: 'Start date']
+  due_date date [note: 'Deadline']
+  completed_at timestamp [note: 'Actual completion time']
+  assignee_id bigint [note: 'Person assigned to this task']
+  reporter_id bigint [not null, note: 'Task creator / reporter']
+  is_deleted boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+  updated_at timestamp
+  updated_by bigint
+}
+
+Table task_skill_requirements {
+  id bigserial [pk, note: 'Primary key']
+  task_id bigint [not null, note: 'Task requiring this skill']
+  skill_id bigint [not null, note: 'Required skill']
+  minimum_level varchar(20) [not null, default: 'INTERMEDIATE', note: 'Minimum required level: BEGINNER / INTERMEDIATE / ADVANCED / EXPERT']
+  is_required boolean [default: true, note: 'Mandatory or preferred only']
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+
+  indexes {
+    (task_id, skill_id) [unique]
+  }
+}
+
+Table task_status_history {
+  id bigserial [pk, note: 'Primary key']
+  task_id bigint [not null, note: 'Task whose status changed']
+  old_status varchar(50) [note: 'Previous status']
+  new_status varchar(50) [not null, note: 'New status']
+  changed_by bigint [not null, note: 'Who made the change']
+  note text [note: 'Reason for change (if any)']
+  changed_at timestamp [not null, default: `now()`]
+}
+
+// ================================================================
+// Time Tracking
+// ================================================================
+
+Table time_logs {
+  id bigserial [pk, note: 'Primary key']
+  task_id bigint [not null, note: 'Which task the time was spent on']
+  user_id bigint [not null, note: 'Employee who logged the time']
+  log_date date [not null, note: 'Date the work was performed']
+  hours_spent decimal(4,1) [not null, note: 'Hours spent on this task on this date']
+  description text [note: 'What was done during this time']
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+  updated_at timestamp
+  updated_by bigint
+
+  indexes {
+    (task_id, user_id, log_date) [unique, note: 'One log entry per task per user per day']
+  }
+}
+
+// ================================================================
+// Notifications
+// ================================================================
+
+Table notifications {
+  id bigserial [pk, note: 'Primary key']
+  recipient_id bigint [not null, note: 'Notification recipient']
+  type varchar(100) [not null, note: 'Notification type: TASK_ASSIGNED / TASK_OVERDUE / OVERLOAD_WARNING / BURNOUT_ALERT']
+  title varchar(300) [not null, note: 'Notification title']
+  content text [note: 'Detailed content']
+  reference_type varchar(50) [note: 'Related object type: TASK / PROJECT']
+  reference_id bigint [note: 'Related object ID']
+  is_read boolean [default: false, note: 'Whether it has been read']
+  read_at timestamp [note: 'Time it was read']
+  created_at timestamp [not null, default: `now()`]
+}
+
+// ================================================================
+// Workload & Capacity
+// ================================================================
+
+Table workload_snapshots {
+  id bigserial [pk, note: 'Primary key']
+  user_id bigint [not null, note: 'Employee']
+  snapshot_date date [not null, note: 'Date of the snapshot']
+  total_allocated_hours decimal(6,1) [note: 'Total hours allocated across all projects']
+  total_actual_hours decimal(6,1) [note: 'Total actual hours worked']
+  capacity_used_percent decimal(5,2) [note: 'Percentage of capacity used']
+  project_count int [default: 0, note: 'Number of active projects']
+  active_task_count int [default: 0, note: 'Number of active tasks']
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    (user_id, snapshot_date) [unique, note: 'One snapshot per user per day']
+  }
+}
+
+Table burnout_logs {
+  id bigserial [pk, note: 'Primary key']
+  user_id bigint [not null, note: 'Employee being monitored']
+  evaluated_at timestamp [not null, default: `now()`, note: 'Time the system performed the evaluation']
+  risk_score int [not null, note: 'Burnout risk score from 0 to 100']
+  risk_level varchar(20) [not null, note: 'Risk level: LOW / MEDIUM / HIGH / CRITICAL']
+  overdue_task_count int [default: 0, note: 'Number of recently overdue tasks']
+  capacity_used_avg decimal(5,2) [note: 'Average % capacity used over the last 4 weeks']
+  is_alert_sent boolean [default: false, note: 'Whether an alert has been sent to the manager']
+  note text [note: 'Notes on the reason for evaluation']
+  created_at timestamp [not null, default: `now()`]
+}
+
+
+// ================================================================
+// References
+// ================================================================
+
+// users
+Ref: users.department_id > departments.id
+Ref: users.created_by > users.id
+Ref: users.updated_by > users.id
+
+// departments
+Ref: departments.manager_id > users.id
+Ref: departments.created_by > users.id
+Ref: departments.updated_by > users.id
+
+// skills
+Ref: skills.created_by > users.id
+Ref: skills.updated_by > users.id
+
+// employee_skills
+Ref: employee_skills.user_id > users.id
+Ref: employee_skills.skill_id > skills.id
+Ref: employee_skills.created_by > users.id
+Ref: employee_skills.updated_by > users.id
+
+// projects
+Ref: projects.manager_id > users.id
+Ref: projects.created_by > users.id
+Ref: projects.updated_by > users.id
+
+// project_members
+Ref: project_members.project_id > projects.id
+Ref: project_members.user_id > users.id
+Ref: project_members.created_by > users.id
+Ref: project_members.updated_by > users.id
+
+// tasks
+Ref: tasks.project_id > projects.id
+Ref: tasks.assignee_id > users.id
+Ref: tasks.reporter_id > users.id
+Ref: tasks.created_by > users.id
+Ref: tasks.updated_by > users.id
+
+// task_skill_requirements
+Ref: task_skill_requirements.task_id > tasks.id
+Ref: task_skill_requirements.skill_id > skills.id
+Ref: task_skill_requirements.created_by > users.id
+
+// task_status_history
+Ref: task_status_history.task_id > tasks.id
+Ref: task_status_history.changed_by > users.id
+
+// time_logs
+Ref: time_logs.task_id > tasks.id
+Ref: time_logs.user_id > users.id
+Ref: time_logs.created_by > users.id
+Ref: time_logs.updated_by > users.id
+
+// notifications
+Ref: notifications.recipient_id > users.id
+
+// workload_snapshots
+Ref: workload_snapshots.user_id > users.id
+
+// burnout_logs
+Ref: burnout_logs.user_id > users.id

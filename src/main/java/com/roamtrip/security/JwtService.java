@@ -24,12 +24,13 @@ public class JwtService {
     @Value("${app.jwt.refresh-expiration-ms:604800000}")
     private long refreshExpirationMs;
 
-    public String generateAccessToken(Long userId, String email, Long sessionId) {
+    public String generateAccessToken(Long userId, String email, String role, Long sessionId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessExpirationMs);
         return Jwts.builder()
                 .subject(email)
                 .claim("userId", userId)
+                .claim("role", role)
                 .claim("sessionId", sessionId)
                 .claim("type", "access")
                 .id(UUID.randomUUID().toString())
