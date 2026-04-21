@@ -1,0 +1,52 @@
+package com.iwas.config;
+
+import com.iwas.security.UserIdPrincipal;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.AuditorAware;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Optional;
+
+@Configuration
+@EnableJpaAuditing(auditorAwareRef = "auditorAware")
+@Slf4j
+public class JpaAuditingConfig {
+
+    @Bean
+    public AuditorAware<Long> auditorAware() {
+        return () -> {
+            log.debug("In security context: hehe");
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return Optional.empty();
+            }
+
+            Object principal = authentication.getPrincipal();
+            if (principal == null) {
+                return Optional.empty();
+            }
+
+            if (principal instanceof UserIdPrincipal userIdPrincipal) {
+                return Optional.ofNullable(userIdPrincipal.getUserId());
+            }
+
+            if (principal instanceof Long userId) {
+                return Optional.of(userId);
+            }
+
+            if (principal instanceof String s) {
+                try {
+                    return Optional.of(Long.parseLong(s));
+                } catch (NumberFormatException ignored) {
+                    return Optional.empty();
+                }
+            }
+
+            return Optional.empty();
+        };
+    }
+}
