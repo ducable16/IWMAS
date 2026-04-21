@@ -18,8 +18,7 @@ import java.time.LocalDateTime;
                 @UniqueConstraint(name = "uq_user_username", columnNames = {"username"})
         },
         indexes = {
-                @Index(name = "idx_user_created_at", columnList = "created_at"),
-                @Index(name = "idx_user_department", columnList = "department_id")
+                @Index(name = "idx_user_created_at", columnList = "created_at")
         }
 )
 public class User extends BaseEntity {
@@ -41,9 +40,6 @@ public class User extends BaseEntity {
 
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
-
-    @Column(name = "department_id")
-    private Long departmentId;
 
     @Column(name = "position", length = 100)
     private String position;

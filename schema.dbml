@@ -1,5 +1,5 @@
 // ================================================================
-// Users & Departments
+// Users
 // ================================================================
 
 Table users {
@@ -10,24 +10,11 @@ Table users {
   full_name varchar(100) [not null, note: 'Full name']
   phone varchar(20) [note: 'Phone number']
   avatar_url varchar(500) [note: 'Profile picture']
-  department_id bigint [note: 'FK to departments']
   position varchar(100) [note: 'Job position / title']
   role varchar(50) [not null, default: 'TEAM_MEMBER', note: 'ADMIN, HR, PROJECT_MANAGER, TEAM_MEMBER']
   is_verified boolean [default: false, note: 'Whether email has been verified']
   last_login_at timestamp [note: 'Last login time']
   is_active boolean [default: true, note: 'Currently employed or resigned']
-  is_deleted boolean [default: false, note: 'Soft delete']
-  created_at timestamp [not null, default: `now()`, note: 'Creation time']
-  created_by bigint [note: 'Created by']
-  updated_at timestamp [note: 'Last update time']
-  updated_by bigint [note: 'Updated by']
-}
-
-Table departments {
-  id bigserial [pk, note: 'Primary key']
-  name varchar(100) [not null, note: 'Department name']
-  description text [note: 'Department description']
-  manager_id bigint [note: 'FK to users — Department manager']
   is_deleted boolean [default: false, note: 'Soft delete']
   created_at timestamp [not null, default: `now()`, note: 'Creation time']
   created_by bigint [note: 'Created by']
@@ -238,14 +225,8 @@ Table burnout_logs {
 // ================================================================
 
 // users
-Ref: users.department_id > departments.id
 Ref: users.created_by > users.id
 Ref: users.updated_by > users.id
-
-// departments
-Ref: departments.manager_id > users.id
-Ref: departments.created_by > users.id
-Ref: departments.updated_by > users.id
 
 // skills
 Ref: skills.created_by > users.id

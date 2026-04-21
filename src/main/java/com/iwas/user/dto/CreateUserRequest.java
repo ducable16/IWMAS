@@ -27,8 +27,6 @@ public class CreateUserRequest {
     @Size(max = 20)
     private String phone;
 
-    private Long departmentId;
-
     @Size(max = 100)
     private String position;
 

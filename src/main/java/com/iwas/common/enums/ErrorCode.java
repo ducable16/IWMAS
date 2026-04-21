@@ -32,10 +32,6 @@ public enum ErrorCode {
     OTP_INCORRECT(1014, "OTP incorrect", HttpStatus.BAD_REQUEST),
     OTP_EXPIRED(1015, "OTP expired", HttpStatus.BAD_REQUEST),
 
-    // --- 2xxx: Department ---
-    DEPARTMENT_NOT_FOUND(2001, "Department not found", HttpStatus.NOT_FOUND),
-    DEPARTMENT_ALREADY_EXISTS(2002, "Department already exists", HttpStatus.CONFLICT),
-
     // --- 3xxx: Skills ---
     SKILL_NOT_FOUND(3001, "Skill not found", HttpStatus.NOT_FOUND),
     SKILL_ALREADY_EXISTS(3002, "Skill already exists", HttpStatus.CONFLICT),

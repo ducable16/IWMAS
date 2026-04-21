@@ -283,7 +283,6 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
                 .avatarUrl(user.getAvatarUrl())
-                .departmentId(user.getDepartmentId())
                 .position(user.getPosition())
                 .role(user.getRole())
                 .verified(user.getIsVerified())

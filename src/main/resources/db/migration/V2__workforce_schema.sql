@@ -31,7 +31,6 @@ ALTER TABLE users
     ADD COLUMN IF NOT EXISTS username varchar(100),
     ADD COLUMN IF NOT EXISTS phone varchar(20),
     ADD COLUMN IF NOT EXISTS avatar_url varchar(500),
-    ADD COLUMN IF NOT EXISTS department_id bigint,
     ADD COLUMN IF NOT EXISTS position varchar(100),
     ADD COLUMN IF NOT EXISTS role varchar(50) NOT NULL DEFAULT 'TEAM_MEMBER',
     ADD COLUMN IF NOT EXISTS is_verified boolean NOT NULL DEFAULT false,
@@ -46,27 +45,6 @@ UPDATE users SET is_active = true WHERE is_verified = true;
 ALTER TABLE users
     ADD CONSTRAINT IF NOT EXISTS uq_user_username UNIQUE (username),
     ADD CONSTRAINT IF NOT EXISTS ck_user_role CHECK (role IN ('ADMIN','HR','PROJECT_MANAGER','TEAM_MEMBER'));
-
-CREATE INDEX IF NOT EXISTS idx_user_department ON users(department_id);
-
--- ================================================================
--- Departments
--- ================================================================
-
-CREATE TABLE IF NOT EXISTS departments (
-    id bigserial PRIMARY KEY,
-    is_active boolean NOT NULL DEFAULT true,
-    is_deleted boolean NOT NULL DEFAULT false,
-    created_at timestamp NOT NULL DEFAULT now(),
-    created_by bigint,
-    updated_at timestamp,
-    updated_by bigint,
-    name varchar(100) NOT NULL,
-    description text,
-    manager_id bigint
-);
-
-CREATE INDEX IF NOT EXISTS idx_department_manager ON departments(manager_id);
 
 -- ================================================================
 -- Skills

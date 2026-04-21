@@ -68,9 +68,6 @@ public class UserService {
         if (request.getPhone() != null && !request.getPhone().isBlank()) {
             user.setPhone(request.getPhone().trim());
         }
-        if (request.getDepartmentId() != null) {
-            user.setDepartmentId(request.getDepartmentId());
-        }
         if (request.getPosition() != null && !request.getPosition().isBlank()) {
             user.setPosition(request.getPosition().trim());
         }
@@ -92,9 +89,6 @@ public class UserService {
         }
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone().isBlank() ? null : request.getPhone().trim());
-        }
-        if (request.getDepartmentId() != null) {
-            user.setDepartmentId(request.getDepartmentId());
         }
         if (request.getPosition() != null) {
             user.setPosition(request.getPosition().isBlank() ? null : request.getPosition().trim());

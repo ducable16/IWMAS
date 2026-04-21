@@ -17,7 +17,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u WHERE u.isDeleted = false ORDER BY u.fullName")
     List<User> findAllActiveUsers();
-
-    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND u.departmentId = :departmentId")
-    List<User> findByDepartmentId(Long departmentId);
 }

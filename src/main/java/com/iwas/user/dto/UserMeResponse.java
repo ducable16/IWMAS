@@ -13,7 +13,6 @@ public class UserMeResponse {
     private String fullName;
     private String phone;
     private String avatarUrl;
-    private Long departmentId;
     private String position;
     private UserRole role;
     private Boolean verified;
