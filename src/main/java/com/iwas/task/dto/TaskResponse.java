@@ -3,6 +3,7 @@ package com.iwas.task.dto;
 import com.iwas.task.enums.TaskPriority;
 import com.iwas.task.enums.TaskStatus;
 import com.iwas.task.enums.TaskType;
+import com.iwas.user.dto.UserMeResponse;
 import lombok.Builder;
 import lombok.Data;
 
@@ -26,9 +27,8 @@ public class TaskResponse {
     private LocalDate startDate;
     private LocalDate dueDate;
     private LocalDateTime completedAt;
-    private Long assigneeId;
-    private String assigneeName;
-    private Long reporterId;
+    private UserMeResponse assignee;
+    private UserMeResponse reporter;
     private List<TaskSkillRequirementResponse> skillRequirements;
     private LocalDateTime createdAt;
 }

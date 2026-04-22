@@ -3,7 +3,6 @@ package com.iwas.auth;
 import com.iwas.auth.dto.AuthResponse;
 import com.iwas.auth.dto.ForgotPasswordRequest;
 import com.iwas.auth.dto.LoginRequest;
-import com.iwas.auth.dto.RefreshTokenRequest;
 import com.iwas.auth.dto.RegisterRequest;
 import com.iwas.auth.dto.ResetPasswordRequest;
 import com.iwas.auth.dto.SendOtpRequest;
@@ -49,11 +48,6 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
-    }
-
-    @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return ResponseEntity.ok(authService.refresh(request));
     }
 
     @PostMapping("/logout")

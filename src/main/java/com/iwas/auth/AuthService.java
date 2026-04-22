@@ -3,7 +3,6 @@ package com.iwas.auth;
 import com.iwas.auth.dto.AuthResponse;
 import com.iwas.auth.dto.ForgotPasswordRequest;
 import com.iwas.auth.dto.LoginRequest;
-import com.iwas.auth.dto.RefreshTokenRequest;
 import com.iwas.auth.dto.RegisterRequest;
 import com.iwas.auth.dto.ResetPasswordRequest;
 import com.iwas.auth.dto.SendOtpRequest;
@@ -14,15 +13,12 @@ import com.iwas.auth.entity.EmailVerification;
 import com.iwas.auth.entity.OtpVerification;
 import com.iwas.auth.entity.PasswordReset;
 import com.iwas.user.entity.User;
-import com.iwas.user.entity.UserSession;
 import com.iwas.common.exception.AppException;
 import com.iwas.auth.repository.EmailVerificationRepository;
 import com.iwas.auth.repository.OtpVerificationRepository;
 import com.iwas.auth.repository.PasswordResetRepository;
 import com.iwas.user.repository.UserRepository;
-import com.iwas.user.repository.UserSessionRepository;
 import com.iwas.security.JwtService;
-import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,7 +36,7 @@ public class AuthService {
     private final EmailVerificationRepository emailVerificationRepository;
     private final OtpVerificationRepository otpVerificationRepository;
     private final PasswordResetRepository passwordResetRepository;
-    private final UserSessionRepository userSessionRepository;
+    private final SessionStore sessionStore;
     private final PasswordEncoder passwordEncoder;
     private final TokenHashingService tokenHashingService;
     private final EmailNotificationProducer emailNotificationProducer;
@@ -117,64 +113,21 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        UserSession session = new UserSession();
-        session.setUser(user);
-        session.setExpiresAt(LocalDateTime.now().plusDays(7));
-        session.setRefreshTokenHash("pending");
-        session = userSessionRepository.save(session);
-
-        String refreshToken = jwtService.generateRefreshToken(user.getId(), user.getEmail(), session.getId());
-        session.setRefreshTokenHash(tokenHashingService.sha256(refreshToken));
-        session.setTokenLast4(refreshToken.substring(Math.max(0, refreshToken.length() - 4)));
-        userSessionRepository.save(session);
-
+        SessionEntry session = sessionStore.create(user, LocalDateTime.now().plusDays(7));
         String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name(), session.getId());
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
                 .expiresIn(jwtService.getAccessExpirationSeconds())
                 .user(toMeResponse(user))
                 .build();
     }
 
-    @Transactional
-    public AuthResponse refresh(RefreshTokenRequest request) {
-        if (!jwtService.isTokenValid(request.getRefreshToken())) {
-            throw new AppException(ErrorCode.UNAUTHENTICATED, "Invalid refresh token");
-        }
-        Claims claims = jwtService.parseClaims(request.getRefreshToken());
-        if (!"refresh".equals(claims.get("type", String.class))) {
-            throw new AppException(ErrorCode.UNAUTHENTICATED, "Invalid token type");
-        }
-
-        UserSession session = userSessionRepository
-                .findByRefreshTokenHash(tokenHashingService.sha256(request.getRefreshToken()))
-                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED, "Session not found"));
-
-        if (!Boolean.TRUE.equals(session.getIsActive()) || session.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new AppException(ErrorCode.UNAUTHENTICATED, "Session expired or revoked");
-        }
-
-        User user = session.getUser();
-        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name(), session.getId());
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(request.getRefreshToken())
-                .expiresIn(jwtService.getAccessExpirationSeconds())
-                .user(toMeResponse(user))
-                .build();
-    }
-
-    @Transactional
     public void logout(Long sessionId) {
         if (sessionId == null) {
             return;
         }
-        userSessionRepository.findById(sessionId).ifPresent(session -> {
-            session.setIsActive(false);
-            userSessionRepository.save(session);
-        });
+        sessionStore.deactivate(sessionId);
     }
 
     @Transactional
@@ -212,7 +165,7 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        userSessionRepository.deleteByUser(user);
+        sessionStore.deleteByUser(user.getId());
         reset.setUsedAt(LocalDateTime.now());
         passwordResetRepository.save(reset);
         return "Password reset successful";

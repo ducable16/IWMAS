@@ -173,26 +173,31 @@ public class TaskService {
         Map<Long, List<TaskSkillRequirementResponse>> skillReqMap = tasks.stream()
                 .collect(Collectors.toMap(Task::getId, t -> getSkillRequirements(t.getId())));
 
-        Map<Long, String> assigneeNames = userRepository.findAllById(
-                tasks.stream().filter(t -> t.getAssigneeId() != null)
-                        .map(Task::getAssigneeId).distinct().toList()
-        ).stream().collect(Collectors.toMap(User::getId, User::getFullName));
+        List<Long> userIds = tasks.stream()
+                .flatMap(t -> java.util.stream.Stream.of(t.getAssigneeId(), t.getReporterId()))
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
 
         return tasks.stream()
                 .map(t -> {
-                    TaskResponse r = toResponse(t, skillReqMap.getOrDefault(t.getId(), Collections.emptyList()));
-                    r.setAssigneeName(assigneeNames.get(t.getAssigneeId()));
-                    return r;
+                    User assignee = userMap.get(t.getAssigneeId());
+                    User reporter = userMap.get(t.getReporterId());
+                    return toResponse(t, skillReqMap.getOrDefault(t.getId(), Collections.emptyList()), assignee, reporter);
                 })
                 .toList();
     }
 
     private TaskResponse toResponse(Task t, List<TaskSkillRequirementResponse> skillReqs) {
-        String assigneeName = null;
-        if (t.getAssigneeId() != null) {
-            assigneeName = userRepository.findById(t.getAssigneeId())
-                    .map(User::getFullName).orElse(null);
-        }
+        User assignee = t.getAssigneeId() != null ? userRepository.findById(t.getAssigneeId()).orElse(null) : null;
+        User reporter = t.getReporterId() != null ? userRepository.findById(t.getReporterId()).orElse(null) : null;
+        return toResponse(t, skillReqs, assignee, reporter);
+    }
+
+    private TaskResponse toResponse(Task t, List<TaskSkillRequirementResponse> skillReqs, User assignee, User reporter) {
         return TaskResponse.builder()
                 .id(t.getId())
                 .projectId(t.getProjectId())
@@ -206,11 +211,26 @@ public class TaskService {
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())
-                .assigneeId(t.getAssigneeId())
-                .assigneeName(assigneeName)
-                .reporterId(t.getReporterId())
+                .assignee(toUserMeResponse(assignee))
+                .reporter(toUserMeResponse(reporter))
                 .skillRequirements(skillReqs)
                 .createdAt(t.getCreatedAt())
+                .build();
+    }
+
+    private com.iwas.user.dto.UserMeResponse toUserMeResponse(User user) {
+        if (user == null) return null;
+        return com.iwas.user.dto.UserMeResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .position(user.getPosition())
+                .role(user.getRole())
+                .verified(user.getIsVerified())
+                .active(user.getIsActive())
                 .build();
     }
 }

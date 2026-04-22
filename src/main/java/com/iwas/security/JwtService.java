@@ -21,9 +21,6 @@ public class JwtService {
     @Value("${app.jwt.access-expiration-ms:900000}")
     private long accessExpirationMs;
 
-    @Value("${app.jwt.refresh-expiration-ms:604800000}")
-    private long refreshExpirationMs;
-
     public String generateAccessToken(Long userId, String email, String role, Long sessionId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessExpirationMs);
@@ -33,21 +30,6 @@ public class JwtService {
                 .claim("role", role)
                 .claim("sessionId", sessionId)
                 .claim("type", "access")
-                .id(UUID.randomUUID().toString())
-                .issuedAt(now)
-                .expiration(expiry)
-                .signWith(key())
-                .compact();
-    }
-
-    public String generateRefreshToken(Long userId, String email, Long sessionId) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + refreshExpirationMs);
-        return Jwts.builder()
-                .subject(email)
-                .claim("userId", userId)
-                .claim("sessionId", sessionId)
-                .claim("type", "refresh")
                 .id(UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiration(expiry)
