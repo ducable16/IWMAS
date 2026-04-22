@@ -44,7 +44,7 @@ public class UserController {
         return ResponseEntity.status(201).body(userService.createUser(request));
     }
 
-    @PutMapping("/{id}")
+    @PostMapping("/{id}/update")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public ResponseEntity<UserMeResponse> updateUser(@PathVariable Long id,
                                                      @Valid @RequestBody UpdateUserRequest request) {
