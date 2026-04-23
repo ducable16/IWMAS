@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Data
 @Builder
@@ -27,9 +29,13 @@ public class TaskResponse {
     private LocalDate startDate;
     private LocalDate dueDate;
     private LocalDateTime completedAt;
+    private String sprint;
+    private Set<String> labels;
     private UserMeResponse assignee;
     private UserMeResponse reporter;
     private List<TaskSkillRequirementResponse> skillRequirements;
+    private Map<String, String> customFields;
     private List<TaskCommentResponse> comments;  // only populated on task detail
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

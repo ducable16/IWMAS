@@ -8,23 +8,32 @@ import com.iwas.task.dto.*;
 import com.iwas.task.entity.Task;
 import com.iwas.task.entity.TaskSkillRequirement;
 import com.iwas.task.entity.TaskStatusHistory;
+import com.iwas.task.enums.TaskStatus;
 import com.iwas.task.repository.TaskRepository;
 import com.iwas.task.repository.TaskSkillRequirementRepository;
+import com.iwas.task.repository.TaskSpecification;
 import com.iwas.task.repository.TaskStatusHistoryRepository;
 import com.iwas.user.entity.User;
 import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -55,18 +64,54 @@ public class TaskService {
         return toDetailResponse(task);
     }
 
+    public TaskPageResponse searchTasks(TaskFilterRequest filter) {
+        int size = Math.min(filter.getSize(), 100);
+        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
+        PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
+
+        Specification<Task> spec = TaskSpecification.fromFilter(filter);
+        Page<Task> page = taskRepository.findAll(spec, pageRequest);
+
+        List<TaskResponse> content = toResponseList(page.getContent());
+        return TaskPageResponse.builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
+    }
+
+    @Cacheable(value = "kanbanBoard", key = "#projectId")
+    public KanbanBoardResponse getKanbanBoard(Long projectId) {
+        List<Task> tasks = taskRepository.findAll(TaskSpecification.byProjectId(projectId));
+        Map<TaskStatus, List<Task>> grouped = tasks.stream()
+                .collect(Collectors.groupingBy(Task::getStatus));
+
+        List<KanbanColumnResponse> columns = Arrays.stream(TaskStatus.values())
+                .map(status -> {
+                    List<Task> columnTasks = grouped.getOrDefault(status, Collections.emptyList());
+                    List<TaskResponse> taskResponses = toResponseList(columnTasks);
+                    return KanbanColumnResponse.builder()
+                            .status(status)
+                            .displayName(status.getDisplayName())
+                            .tasks(taskResponses)
+                            .count(taskResponses.size())
+                            .build();
+                })
+                .toList();
+
+        return KanbanBoardResponse.builder()
+                .projectId(projectId)
+                .columns(columns)
+                .build();
+    }
+
     @Transactional
+    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse createTask(TaskRequest request, Long reporterId) {
         Task task = new Task();
-        task.setProjectId(request.getProjectId());
-        task.setTitle(request.getTitle().trim());
-        task.setDescription(request.getDescription());
-        task.setType(request.getType());
-        task.setPriority(request.getPriority());
-        task.setEstimatedHours(request.getEstimatedHours());
-        task.setStartDate(request.getStartDate());
-        task.setDueDate(request.getDueDate());
-        task.setAssigneeId(request.getAssigneeId());
+        applyRequest(task, request);
         task.setReporterId(reporterId);
         task = taskRepository.save(task);
 
@@ -78,16 +123,10 @@ public class TaskService {
     }
 
     @Transactional
+    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse updateTask(Long id, TaskRequest request) {
         Task task = findTask(id);
-        task.setTitle(request.getTitle().trim());
-        task.setDescription(request.getDescription());
-        task.setType(request.getType());
-        task.setPriority(request.getPriority());
-        task.setEstimatedHours(request.getEstimatedHours());
-        task.setStartDate(request.getStartDate());
-        task.setDueDate(request.getDueDate());
-        task.setAssigneeId(request.getAssigneeId());
+        applyRequest(task, request);
         task = taskRepository.save(task);
 
         if (request.getSkillRequirements() != null) {
@@ -99,8 +138,17 @@ public class TaskService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "kanbanBoard", allEntries = true),
+            @CacheEvict(value = "taskStatusHistory", key = "#id")
+    })
     public TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request, Long changedById) {
         Task task = findTask(id);
+
+        if (!task.getStatus().canTransitionTo(request.getStatus())) {
+            throw new AppException(ErrorCode.TASK_INVALID_STATUS_TRANSITION);
+        }
+
         TaskStatusHistory history = new TaskStatusHistory();
         history.setTaskId(id);
         history.setOldStatus(task.getStatus());
@@ -110,20 +158,24 @@ public class TaskService {
         taskStatusHistoryRepository.save(history);
 
         task.setStatus(request.getStatus());
-        if (request.getStatus().name().equals("DONE")) {
+        if (request.getStatus() == TaskStatus.DONE) {
             task.setCompletedAt(LocalDateTime.now());
+        } else if (task.getCompletedAt() != null) {
+            task.setCompletedAt(null);
         }
         task = taskRepository.save(task);
         return toResponse(task, getSkillRequirements(task.getId()));
     }
 
     @Transactional
+    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public void deleteTask(Long id) {
         Task task = findTask(id);
         task.setIsDeleted(true);
         taskRepository.save(task);
     }
 
+    @Cacheable(value = "taskStatusHistory", key = "#taskId")
     public List<TaskStatusHistoryResponse> getStatusHistory(Long taskId) {
         findTask(taskId);
         return taskStatusHistoryRepository.findByTaskIdOrderByChangedAtAsc(taskId).stream()
@@ -138,6 +190,21 @@ public class TaskService {
                 .toList();
     }
 
+    private void applyRequest(Task task, TaskRequest request) {
+        task.setProjectId(request.getProjectId());
+        task.setTitle(request.getTitle().trim());
+        task.setDescription(request.getDescription());
+        task.setType(request.getType());
+        task.setPriority(request.getPriority());
+        task.setEstimatedHours(request.getEstimatedHours());
+        task.setStartDate(request.getStartDate());
+        task.setDueDate(request.getDueDate());
+        task.setAssigneeId(request.getAssigneeId());
+        task.setSprint(request.getSprint());
+        task.setLabels(request.getLabels() != null ? request.getLabels() : new HashSet<>());
+        task.setCustomFields(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
+    }
+
     private Task findTask(Long id) {
         return taskRepository.findById(id)
                 .filter(t -> !Boolean.TRUE.equals(t.getIsDeleted()))
@@ -145,14 +212,15 @@ public class TaskService {
     }
 
     private void saveSkillRequirements(Long taskId, List<TaskSkillRequirementRequest> reqs) {
-        reqs.forEach(req -> {
+        List<TaskSkillRequirement> entities = reqs.stream().map(req -> {
             TaskSkillRequirement tsr = new TaskSkillRequirement();
             tsr.setTaskId(taskId);
             tsr.setSkillId(req.getSkillId());
             tsr.setMinimumLevel(req.getMinimumLevel());
             tsr.setIsRequired(req.getIsRequired());
-            taskSkillRequirementRepository.save(tsr);
-        });
+            return tsr;
+        }).toList();
+        taskSkillRequirementRepository.saveAll(entities);
     }
 
     private List<TaskSkillRequirementResponse> getSkillRequirements(Long taskId) {
@@ -177,12 +245,29 @@ public class TaskService {
     private List<TaskResponse> toResponseList(List<Task> tasks) {
         if (tasks.isEmpty()) return Collections.emptyList();
 
-        Map<Long, List<TaskSkillRequirementResponse>> skillReqMap = tasks.stream()
-                .collect(Collectors.toMap(Task::getId, t -> getSkillRequirements(t.getId())));
+        List<Long> taskIds = tasks.stream().map(Task::getId).toList();
+
+        List<TaskSkillRequirement> allReqs = taskSkillRequirementRepository.findByTaskIdIn(taskIds);
+        Set<Long> skillIds = allReqs.stream().map(TaskSkillRequirement::getSkillId).collect(Collectors.toSet());
+        Map<Long, String> skillNames = skillIds.isEmpty() ? Map.of() :
+                skillRepository.findAllById(skillIds).stream()
+                        .collect(Collectors.toMap(Skill::getId, Skill::getName));
+
+        Map<Long, List<TaskSkillRequirementResponse>> skillReqMap = new HashMap<>();
+        taskIds.forEach(id -> skillReqMap.put(id, new ArrayList<>()));
+        allReqs.forEach(r -> skillReqMap.get(r.getTaskId()).add(
+                TaskSkillRequirementResponse.builder()
+                        .id(r.getId())
+                        .skillId(r.getSkillId())
+                        .skillName(skillNames.get(r.getSkillId()))
+                        .minimumLevel(r.getMinimumLevel())
+                        .isRequired(r.getIsRequired())
+                        .build()
+        ));
 
         List<Long> userIds = tasks.stream()
-                .flatMap(t -> java.util.stream.Stream.of(t.getAssigneeId(), t.getReporterId()))
-                .filter(java.util.Objects::nonNull)
+                .flatMap(t -> Stream.of(t.getAssigneeId(), t.getReporterId()))
+                .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 
@@ -190,11 +275,8 @@ public class TaskService {
                 .collect(Collectors.toMap(User::getId, u -> u));
 
         return tasks.stream()
-                .map(t -> {
-                    User assignee = userMap.get(t.getAssigneeId());
-                    User reporter = userMap.get(t.getReporterId());
-                    return toResponse(t, skillReqMap.getOrDefault(t.getId(), Collections.emptyList()), assignee, reporter);
-                })
+                .map(t -> toResponse(t, skillReqMap.getOrDefault(t.getId(), Collections.emptyList()),
+                        userMap.get(t.getAssigneeId()), userMap.get(t.getReporterId())))
                 .toList();
     }
 
@@ -218,16 +300,17 @@ public class TaskService {
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())
-                .assignee(toUserMeResponse(assignee))
-                .reporter(toUserMeResponse(reporter))
+                .sprint(t.getSprint())
+                .labels(t.getLabels())
+                .customFields(t.getCustomFields())
+                .assignee(UserMapper.toUserMeResponse(assignee))
+                .reporter(UserMapper.toUserMeResponse(reporter))
                 .skillRequirements(skillReqs)
                 .createdAt(t.getCreatedAt())
+                .updatedAt(t.getUpdatedAt())
                 .build();
     }
 
-    /**
-     * Full detail response — includes comments. Used by getTaskById only.
-     */
     private TaskResponse toDetailResponse(Task t) {
         User assignee = t.getAssigneeId() != null ? userRepository.findById(t.getAssigneeId()).orElse(null) : null;
         User reporter = t.getReporterId() != null ? userRepository.findById(t.getReporterId()).orElse(null) : null;
@@ -245,15 +328,46 @@ public class TaskService {
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())
+                .sprint(t.getSprint())
+                .labels(t.getLabels())
+                .customFields(t.getCustomFields())
                 .assignee(UserMapper.toUserMeResponse(assignee))
                 .reporter(UserMapper.toUserMeResponse(reporter))
                 .skillRequirements(getSkillRequirements(t.getId()))
                 .comments(comments)
                 .createdAt(t.getCreatedAt())
+                .updatedAt(t.getUpdatedAt())
                 .build();
     }
 
-    private com.iwas.user.dto.UserMeResponse toUserMeResponse(User user) {
-        return UserMapper.toUserMeResponse(user);
+    public List<CalendarDayResponse> getCalendarView(LocalDate from, LocalDate to, Long projectId) {
+        List<Task> tasks = taskRepository.findAll(TaskSpecification.forCalendar(from, to, projectId));
+
+        Map<LocalDate, List<Task>> grouped = tasks.stream()
+                .collect(Collectors.groupingBy(Task::getDueDate));
+
+        return from.datesUntil(to.plusDays(1))
+                .filter(grouped::containsKey)
+                .map(date -> {
+                    List<TaskResponse> dayTasks = toResponseList(grouped.get(date));
+                    return CalendarDayResponse.builder()
+                            .date(date)
+                            .tasks(dayTasks)
+                            .count(dayTasks.size())
+                            .build();
+                })
+                .toList();
+    }
+
+    private Sort buildSort(String sortBy, String direction) {
+        Sort.Direction dir = "ASC".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String field = switch (sortBy == null ? "" : sortBy.toLowerCase()) {
+            case "priority" -> "priority";
+            case "duedate", "due_date" -> "dueDate";
+            case "title" -> "title";
+            case "updatedat", "updated_at" -> "updatedAt";
+            default -> "createdAt";
+        };
+        return Sort.by(dir, field);
     }
 }

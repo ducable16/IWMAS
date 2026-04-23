@@ -10,6 +10,8 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Data
 public class TaskRequest {
@@ -35,5 +37,12 @@ public class TaskRequest {
 
     private Long assigneeId;
 
+    @Size(max = 100, message = "Sprint name must be at most 100 characters")
+    private String sprint;
+
+    private Set<String> labels;
+
     private List<TaskSkillRequirementRequest> skillRequirements;
+
+    private Map<String, String> customFields;
 }

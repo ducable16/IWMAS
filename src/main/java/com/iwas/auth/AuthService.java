@@ -39,7 +39,7 @@ public class AuthService {
     private final SessionStore sessionStore;
     private final PasswordEncoder passwordEncoder;
     private final TokenHashingService tokenHashingService;
-    private final EmailNotificationProducer emailNotificationProducer;
+//    private final EmailNotificationProducer emailNotificationProducer;
     private final JwtService jwtService;
 
     private static final int OTP_MAX_ATTEMPTS = 5;
@@ -68,12 +68,12 @@ public class AuthService {
         verification.setExpiresAt(LocalDateTime.now().plusHours(24));
         emailVerificationRepository.save(verification);
 
-        emailNotificationProducer.publish(EmailMessage.builder()
-                .to(user.getEmail())
-                .subject("Verify your Workforce account")
-                .template("email-verification")
-                .token(rawToken)
-                .build());
+//        emailNotificationProducer.publish(EmailMessage.builder()
+//                .to(user.getEmail())
+//                .subject("Verify your Workforce account")
+//                .template("email-verification")
+//                .token(rawToken)
+//                .build());
 
         return "Check your email to verify your account";
     }
@@ -141,12 +141,12 @@ public class AuthService {
             reset.setExpiresAt(LocalDateTime.now().plusHours(1));
             passwordResetRepository.save(reset);
 
-            emailNotificationProducer.publish(EmailMessage.builder()
-                    .to(user.getEmail())
-                    .subject("Reset your Workforce password")
-                    .template("password-reset")
-                    .token(rawToken)
-                    .build());
+//            emailNotificationProducer.publish(EmailMessage.builder()
+//                    .to(user.getEmail())
+//                    .subject("Reset your Workforce password")
+//                    .template("password-reset")
+//                    .token(rawToken)
+//                    .build());
         });
         return "If the email exists, a reset instruction has been sent";
     }
@@ -185,12 +185,12 @@ public class AuthService {
         otpVerification.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
         otpVerificationRepository.save(otpVerification);
 
-        emailNotificationProducer.publish(EmailMessage.builder()
-                .to(user.getEmail())
-                .subject("Your Workforce verification code")
-                .template("email-otp")
-                .token(rawOtp)
-                .build());
+//        emailNotificationProducer.publish(EmailMessage.builder()
+//                .to(user.getEmail())
+//                .subject("Your Workforce verification code")
+//                .template("email-otp")
+//                .token(rawOtp)
+//                .build());
 
         return "OTP has been sent to your email";
     }

@@ -7,10 +7,16 @@ import com.iwas.task.enums.TaskType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -21,7 +27,10 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_task_project", columnList = "project_id"),
                 @Index(name = "idx_task_assignee", columnList = "assignee_id"),
                 @Index(name = "idx_task_status", columnList = "status"),
-                @Index(name = "idx_task_due_date", columnList = "due_date")
+                @Index(name = "idx_task_due_date", columnList = "due_date"),
+                @Index(name = "idx_task_reporter", columnList = "reporter_id"),
+                @Index(name = "idx_task_priority", columnList = "priority"),
+                @Index(name = "idx_task_sprint", columnList = "sprint")
         }
 )
 public class Task extends BaseEntity {
@@ -67,4 +76,28 @@ public class Task extends BaseEntity {
 
     @Column(name = "reporter_id", nullable = false)
     private Long reporterId;
+
+    @Column(name = "sprint", length = 100)
+    private String sprint;
+
+    @Fetch(FetchMode.SELECT)
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "task_labels",
+            joinColumns = @JoinColumn(name = "task_id"),
+            indexes = @Index(name = "idx_task_label", columnList = "task_id, label")
+    )
+    @Column(name = "label", length = 100)
+    private Set<String> labels = new HashSet<>();
+
+    @Fetch(FetchMode.SELECT)
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "task_custom_fields",
+            joinColumns = @JoinColumn(name = "task_id"),
+            indexes = @Index(name = "idx_tcf_task", columnList = "task_id")
+    )
+    @MapKeyColumn(name = "field_key", length = 100)
+    @Column(name = "field_value", length = 500)
+    private Map<String, String> customFields = new HashMap<>();
 }
