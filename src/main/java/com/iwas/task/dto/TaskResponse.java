@@ -30,5 +30,6 @@ public class TaskResponse {
     private UserMeResponse assignee;
     private UserMeResponse reporter;
     private List<TaskSkillRequirementResponse> skillRequirements;
+    private List<TaskCommentResponse> comments;  // only populated on task detail
     private LocalDateTime createdAt;
 }

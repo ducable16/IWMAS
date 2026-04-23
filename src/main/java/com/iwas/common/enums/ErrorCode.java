@@ -26,6 +26,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(1008, "User not found", HttpStatus.NOT_FOUND),
     UNAUTHENTICATED(1009, "Unauthenticated", HttpStatus.UNAUTHORIZED),
     UNAUTHORIZED(1010, "You do not have permission", HttpStatus.FORBIDDEN),
+    FORBIDDEN(1016, "You are not allowed to perform this action", HttpStatus.FORBIDDEN),
     INVALID_OTP(1011, "Invalid or expired OTP", HttpStatus.BAD_REQUEST),
     INVALID_INPUT(1012, "Invalid input", HttpStatus.BAD_REQUEST),
     INVALID_FORMAT(1013, "Invalid JSON format", HttpStatus.BAD_REQUEST),
@@ -47,6 +48,7 @@ public enum ErrorCode {
     // --- 5xxx: Tasks ---
     TASK_NOT_FOUND(5001, "Task not found", HttpStatus.NOT_FOUND),
     TASK_INVALID_STATUS_TRANSITION(5002, "Invalid task status transition", HttpStatus.BAD_REQUEST),
+    TASK_COMMENT_NOT_FOUND(5003, "Task comment not found", HttpStatus.NOT_FOUND),
 
     // --- 6xxx: Time Logs ---
     TIME_LOG_NOT_FOUND(6001, "Time log not found", HttpStatus.NOT_FOUND),

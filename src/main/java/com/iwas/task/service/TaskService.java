@@ -12,8 +12,11 @@ import com.iwas.task.repository.TaskRepository;
 import com.iwas.task.repository.TaskSkillRequirementRepository;
 import com.iwas.task.repository.TaskStatusHistoryRepository;
 import com.iwas.user.entity.User;
+import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,10 @@ public class TaskService {
     private final SkillRepository skillRepository;
     private final UserRepository userRepository;
 
+    @Lazy
+    @Autowired
+    private TaskCommentService taskCommentService;
+
     public List<TaskResponse> getTasksByProject(Long projectId) {
         List<Task> tasks = taskRepository.findByProjectId(projectId);
         return toResponseList(tasks);
@@ -45,7 +52,7 @@ public class TaskService {
 
     public TaskResponse getTaskById(Long id) {
         Task task = findTask(id);
-        return toResponse(task, getSkillRequirements(task.getId()));
+        return toDetailResponse(task);
     }
 
     @Transactional
@@ -218,19 +225,35 @@ public class TaskService {
                 .build();
     }
 
-    private com.iwas.user.dto.UserMeResponse toUserMeResponse(User user) {
-        if (user == null) return null;
-        return com.iwas.user.dto.UserMeResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .username(user.getUsername())
-                .fullName(user.getFullName())
-                .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
-                .position(user.getPosition())
-                .role(user.getRole())
-                .verified(user.getIsVerified())
-                .active(user.getIsActive())
+    /**
+     * Full detail response — includes comments. Used by getTaskById only.
+     */
+    private TaskResponse toDetailResponse(Task t) {
+        User assignee = t.getAssigneeId() != null ? userRepository.findById(t.getAssigneeId()).orElse(null) : null;
+        User reporter = t.getReporterId() != null ? userRepository.findById(t.getReporterId()).orElse(null) : null;
+        List<TaskCommentResponse> comments = taskCommentService.getCommentsByTask(t.getId());
+        return TaskResponse.builder()
+                .id(t.getId())
+                .projectId(t.getProjectId())
+                .title(t.getTitle())
+                .description(t.getDescription())
+                .type(t.getType())
+                .status(t.getStatus())
+                .priority(t.getPriority())
+                .estimatedHours(t.getEstimatedHours())
+                .actualHours(t.getActualHours())
+                .startDate(t.getStartDate())
+                .dueDate(t.getDueDate())
+                .completedAt(t.getCompletedAt())
+                .assignee(UserMapper.toUserMeResponse(assignee))
+                .reporter(UserMapper.toUserMeResponse(reporter))
+                .skillRequirements(getSkillRequirements(t.getId()))
+                .comments(comments)
+                .createdAt(t.getCreatedAt())
                 .build();
+    }
+
+    private com.iwas.user.dto.UserMeResponse toUserMeResponse(User user) {
+        return UserMapper.toUserMeResponse(user);
     }
 }
