@@ -232,7 +232,6 @@ public class AuthService {
         return UserMeResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .username(user.getUsername())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
                 .avatarUrl(user.getAvatarUrl())

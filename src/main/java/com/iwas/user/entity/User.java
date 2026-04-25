@@ -14,17 +14,13 @@ import java.time.LocalDateTime;
 @Table(
         name = "users",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uq_user_email", columnNames = {"email"}),
-                @UniqueConstraint(name = "uq_user_username", columnNames = {"username"})
+                @UniqueConstraint(name = "uq_user_email", columnNames = {"email"})
         },
         indexes = {
                 @Index(name = "idx_user_created_at", columnList = "created_at")
         }
 )
 public class User extends BaseEntity {
-
-    @Column(name = "username", unique = true, length = 100)
-    private String username;
 
     @Column(name = "email", nullable = false, length = 100, unique = true)
     private String email;

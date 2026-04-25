@@ -28,7 +28,6 @@ ALTER TABLE users
     DROP COLUMN IF EXISTS gender;
 
 ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS username varchar(100),
     ADD COLUMN IF NOT EXISTS phone varchar(20),
     ADD COLUMN IF NOT EXISTS avatar_url varchar(500),
     ADD COLUMN IF NOT EXISTS position varchar(100),
@@ -43,7 +42,6 @@ UPDATE users SET is_verified = is_active WHERE is_verified = false;
 UPDATE users SET is_active = true WHERE is_verified = true;
 
 ALTER TABLE users
-    ADD CONSTRAINT IF NOT EXISTS uq_user_username UNIQUE (username),
     ADD CONSTRAINT IF NOT EXISTS ck_user_role CHECK (role IN ('ADMIN','HR','PROJECT_MANAGER','TEAM_MEMBER'));
 
 -- ================================================================

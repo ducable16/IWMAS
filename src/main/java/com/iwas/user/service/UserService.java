@@ -62,9 +62,6 @@ public class UserService {
         user.setFullName(request.getFullName().trim());
         user.setIsVerified(true);
         user.setRole(request.getRole() != null ? request.getRole() : UserRole.TEAM_MEMBER);
-        if (request.getUsername() != null && !request.getUsername().isBlank()) {
-            user.setUsername(request.getUsername().trim());
-        }
         if (request.getPhone() != null && !request.getPhone().isBlank()) {
             user.setPhone(request.getPhone().trim());
         }
@@ -83,9 +80,6 @@ public class UserService {
         }
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName().trim());
-        }
-        if (request.getUsername() != null && !request.getUsername().isBlank()) {
-            user.setUsername(request.getUsername().trim());
         }
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone().isBlank() ? null : request.getPhone().trim());

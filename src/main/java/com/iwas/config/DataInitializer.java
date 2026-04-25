@@ -22,7 +22,6 @@ public class DataInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         if (!userRepository.existsByEmail("admin@workforce.com")) {
             User admin = new User();
-            admin.setUsername("admin");
             admin.setEmail("admin@workforce.com");
             admin.setPasswordHash(passwordEncoder.encode("Admin@123"));
             admin.setFullName("System Admin");

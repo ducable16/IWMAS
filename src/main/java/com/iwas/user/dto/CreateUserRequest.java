@@ -21,9 +21,6 @@ public class CreateUserRequest {
     @Size(max = 100)
     private String fullName;
 
-    @Size(max = 100)
-    private String username;
-
     @Size(max = 20)
     private String phone;
 
