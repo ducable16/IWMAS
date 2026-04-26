@@ -1,11 +1,16 @@
 package com.iwas.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iwas.common.dto.ApiResponse;
+import com.iwas.common.enums.ErrorCode;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -21,6 +26,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private JwtService jwtService;
 
     private CustomUserDetailsService userDetailsService;
+
+    private ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(
@@ -38,7 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
         if (!jwtService.isTokenValid(token)) {
-            filterChain.doFilter(request, response);
+            writeInvalidTokenResponse(response);
             return;
         }
         Claims claims = jwtService.parseClaims(token);
@@ -47,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String type = claims.get("type", String.class);
 
         if (!"access".equals(type)) {
-            filterChain.doFilter(request, response);
+            writeInvalidTokenResponse(response);
             return;
         }
 
@@ -75,5 +82,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
     }
-}
 
+    private void writeInvalidTokenResponse(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(
+                response.getWriter(),
+                ApiResponse.error(ErrorCode.INVALID_ACCESS_TOKEN)
+        );
+    }
+}

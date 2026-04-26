@@ -8,12 +8,15 @@ import com.iwas.auth.dto.ResetPasswordRequest;
 import com.iwas.auth.dto.SendOtpRequest;
 import com.iwas.auth.dto.VerifyOtpRequest;
 import com.iwas.security.AuthenticatedUserResolver;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final RefreshTokenService refreshTokenService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @Value("${app.frontend.base-url:http://localhost:3000}")
@@ -49,13 +53,37 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request);
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+        AuthService.LoginResult result = authService.login(request);
+        ResponseCookie cookie = refreshTokenService.buildCookie(
+                result.refreshToken().rawToken(),
+                result.refreshToken().ttl()
+        );
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        return result.response();
+    }
+
+    @PostMapping("/refresh")
+    public AuthResponse refresh(
+            @CookieValue(name = RefreshTokenService.COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse response
+    ) {
+        AuthService.RefreshResult result = authService.refresh(refreshToken);
+        ResponseCookie cookie = refreshTokenService.buildCookie(
+                result.refreshToken().rawToken(),
+                result.refreshToken().ttl()
+        );
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        return result.response();
     }
 
     @PostMapping("/logout")
-    public String logout() {
-        authService.logout(authenticatedUserResolver.currentSessionId());
+    public String logout(
+            @CookieValue(name = RefreshTokenService.COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse response
+    ) {
+        authService.logout(authenticatedUserResolver.currentSessionId(), refreshToken);
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenService.buildClearCookie().toString());
         return "Logged out";
     }
 

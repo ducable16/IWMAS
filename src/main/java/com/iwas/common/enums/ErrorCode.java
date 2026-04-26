@@ -30,6 +30,11 @@ public enum ErrorCode {
     INVALID_FORMAT(1013, "Invalid JSON format", HttpStatus.BAD_REQUEST),
     OTP_INCORRECT(1014, "OTP incorrect", HttpStatus.BAD_REQUEST),
     OTP_EXPIRED(1015, "OTP expired", HttpStatus.BAD_REQUEST),
+    INVALID_ACCESS_TOKEN(1017, "Invalid or expired access token", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_MISSING(1018, "Refresh token is missing", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_INVALID(1019, "Invalid refresh token", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_REVOKED(1020, "Refresh token has been revoked", HttpStatus.UNAUTHORIZED),
+    REFRESH_TOKEN_EXPIRED(1021, "Refresh token has expired", HttpStatus.UNAUTHORIZED),
 
     // --- 3xxx: Skills ---
     SKILL_NOT_FOUND(3001, "Skill not found", HttpStatus.NOT_FOUND),

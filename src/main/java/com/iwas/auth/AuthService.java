@@ -41,6 +41,7 @@ public class AuthService {
     private final TokenHashingService tokenHashingService;
 //    private final EmailNotificationProducer emailNotificationProducer;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     private static final int OTP_MAX_ATTEMPTS = 5;
     private static final int OTP_EXPIRY_MINUTES = 5;
@@ -96,7 +97,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse login(LoginRequest request) {
+    public LoginResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -116,19 +117,42 @@ public class AuthService {
         SessionEntry session = sessionStore.create(user, LocalDateTime.now().plusDays(7));
         String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name(), session.getId());
 
-        return AuthResponse.builder()
+        RefreshTokenService.IssuedToken refresh = refreshTokenService.issue(user);
+
+        AuthResponse response = AuthResponse.builder()
                 .accessToken(accessToken)
                 .expiresIn(jwtService.getAccessExpirationSeconds())
                 .user(toMeResponse(user))
                 .build();
+        return new LoginResult(response, refresh);
     }
 
-    public void logout(Long sessionId) {
-        if (sessionId == null) {
-            return;
-        }
-        sessionStore.deactivate(sessionId);
+    @Transactional
+    public RefreshResult refresh(String rawRefreshToken) {
+        RefreshTokenService.RotationResult rotated = refreshTokenService.rotate(rawRefreshToken);
+        User user = rotated.user();
+
+        SessionEntry session = sessionStore.create(user, LocalDateTime.now().plusDays(7));
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name(), session.getId());
+
+        AuthResponse response = AuthResponse.builder()
+                .accessToken(accessToken)
+                .expiresIn(jwtService.getAccessExpirationSeconds())
+                .user(toMeResponse(user))
+                .build();
+        return new RefreshResult(response, rotated.token());
     }
+
+    public void logout(Long sessionId, String rawRefreshToken) {
+        if (sessionId != null) {
+            sessionStore.deactivate(sessionId);
+        }
+        refreshTokenService.revoke(rawRefreshToken);
+    }
+
+    public record LoginResult(AuthResponse response, RefreshTokenService.IssuedToken refreshToken) {}
+
+    public record RefreshResult(AuthResponse response, RefreshTokenService.IssuedToken refreshToken) {}
 
     @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
