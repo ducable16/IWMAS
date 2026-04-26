@@ -19,7 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import java.io.File;
 
-@RestControllerAdvice(basePackages = "com.roamtrip")
+@RestControllerAdvice(basePackages = "com.iwas")
 @AllArgsConstructor
 @Slf4j
 public class ApiResponseWrapper implements ResponseBodyAdvice<Object> {

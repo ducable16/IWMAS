@@ -9,7 +9,7 @@ import com.iwas.user.dto.UserMeResponse;
 import com.iwas.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,53 +24,54 @@ public class UserController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping("/me")
-    public ResponseEntity<UserMeResponse> getMe() {
-        return ResponseEntity.ok(userService.getMe(authenticatedUserResolver.currentUserId()));
+    public UserMeResponse getMe() {
+        return userService.getMe(authenticatedUserResolver.currentUserId());
     }
 
     @PostMapping("/me/update")
-    public ResponseEntity<UserMeResponse> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
-        return ResponseEntity.ok(userService.updateProfile(authenticatedUserResolver.currentUserId(), request));
+    public UserMeResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        return userService.updateProfile(authenticatedUserResolver.currentUserId(), request);
     }
 
     @PostMapping("/me/password")
-    public ResponseEntity<String> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        return ResponseEntity.ok(userService.changePassword(authenticatedUserResolver.currentUserId(), request));
+    public String changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        return userService.changePassword(authenticatedUserResolver.currentUserId(), request);
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserMeResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
-        return ResponseEntity.status(201).body(userService.createUser(request));
+    @ResponseStatus(HttpStatus.CREATED)
+    public UserMeResponse createUser(@Valid @RequestBody CreateUserRequest request) {
+        return userService.createUser(request);
     }
 
     @PostMapping("/{id}/update")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
-    public ResponseEntity<UserMeResponse> updateUser(@PathVariable Long id,
-                                                     @Valid @RequestBody UpdateUserRequest request) {
-        return ResponseEntity.ok(userService.updateUser(id, request, authenticatedUserResolver.currentUserRole()));
+    public UserMeResponse updateUser(@PathVariable Long id,
+                                     @Valid @RequestBody UpdateUserRequest request) {
+        return userService.updateUser(id, request, authenticatedUserResolver.currentUserRole());
     }
 
     @GetMapping
-    public ResponseEntity<List<UserMeResponse>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public List<UserMeResponse> getAllUsers() {
+        return userService.getAllUsers();
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public ResponseEntity<UserMeResponse> getUserById(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.getUserById(id));
+    public UserMeResponse getUserById(@PathVariable Long id) {
+        return userService.getUserById(id);
     }
 
     @PostMapping("/{id}/activate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserMeResponse> activateUser(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.toggleUserActive(id, true));
+    public UserMeResponse activateUser(@PathVariable Long id) {
+        return userService.toggleUserActive(id, true);
     }
 
     @PostMapping("/{id}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserMeResponse> deactivateUser(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.toggleUserActive(id, false));
+    public UserMeResponse deactivateUser(@PathVariable Long id) {
+        return userService.toggleUserActive(id, false);
     }
 }

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,10 +34,12 @@ public class AuthController {
     private String frontendBaseUrl;
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(authService.register(request));
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public String register(@Valid @RequestBody RegisterRequest request) {
+        return authService.register(request);
     }
 
+    // Giữ ResponseEntity vì cần set Location header cho redirect
     @GetMapping("/verify-email")
     public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
@@ -46,33 +49,33 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+        return authService.login(request);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<String> logout() {
+    public String logout() {
         authService.logout(authenticatedUserResolver.currentSessionId());
-        return ResponseEntity.ok("Logged out");
+        return "Logged out";
     }
 
     @PostMapping("/send-otp")
-    public ResponseEntity<String> sendOtp(@Valid @RequestBody SendOtpRequest request) {
-        return ResponseEntity.ok(authService.sendOtp(request));
+    public String sendOtp(@Valid @RequestBody SendOtpRequest request) {
+        return authService.sendOtp(request);
     }
 
     @PostMapping("/verify-email-otp")
-    public ResponseEntity<String> verifyEmailOtp(@Valid @RequestBody VerifyOtpRequest request) {
-        return ResponseEntity.ok(authService.verifyEmailOtp(request));
+    public String verifyEmailOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        return authService.verifyEmailOtp(request);
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        return ResponseEntity.ok(authService.forgotPassword(request));
+    public String forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return authService.forgotPassword(request);
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        return ResponseEntity.ok(authService.resetPassword(request));
+    public String resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return authService.resetPassword(request);
     }
 }

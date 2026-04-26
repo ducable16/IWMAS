@@ -7,7 +7,6 @@ import com.iwas.skill.service.SkillService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,38 +21,37 @@ public class EmployeeSkillController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping("/{userId}/skills")
-    public ResponseEntity<List<EmployeeSkillResponse>> getEmployeeSkills(@PathVariable Long userId) {
-        return ResponseEntity.ok(skillService.getEmployeeSkills(userId));
+    public List<EmployeeSkillResponse> getEmployeeSkills(@PathVariable Long userId) {
+        return skillService.getEmployeeSkills(userId);
     }
 
     @GetMapping("/me/skills")
-    public ResponseEntity<List<EmployeeSkillResponse>> getMySkills() {
-        return ResponseEntity.ok(skillService.getEmployeeSkills(authenticatedUserResolver.currentUserId()));
+    public List<EmployeeSkillResponse> getMySkills() {
+        return skillService.getEmployeeSkills(authenticatedUserResolver.currentUserId());
     }
 
     @PostMapping("/me/skills")
-    public ResponseEntity<EmployeeSkillResponse> addMySkill(@Valid @RequestBody EmployeeSkillRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(skillService.addEmployeeSkill(authenticatedUserResolver.currentUserId(), request));
+    @ResponseStatus(HttpStatus.CREATED)
+    public EmployeeSkillResponse addMySkill(@Valid @RequestBody EmployeeSkillRequest request) {
+        return skillService.addEmployeeSkill(authenticatedUserResolver.currentUserId(), request);
     }
 
     @PostMapping("/me/skills/{skillId}/update")
-    public ResponseEntity<EmployeeSkillResponse> updateMySkill(@PathVariable Long skillId,
-                                                               @Valid @RequestBody EmployeeSkillRequest request) {
-        return ResponseEntity.ok(skillService.updateEmployeeSkill(authenticatedUserResolver.currentUserId(), skillId, request));
+    public EmployeeSkillResponse updateMySkill(@PathVariable Long skillId,
+                                               @Valid @RequestBody EmployeeSkillRequest request) {
+        return skillService.updateEmployeeSkill(authenticatedUserResolver.currentUserId(), skillId, request);
     }
 
     @PostMapping("/me/skills/{skillId}/delete")
-    public ResponseEntity<Void> removeMySkill(@PathVariable Long skillId) {
+    public void removeMySkill(@PathVariable Long skillId) {
         skillService.removeEmployeeSkill(authenticatedUserResolver.currentUserId(), skillId);
-        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{userId}/skills")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
-    public ResponseEntity<EmployeeSkillResponse> addEmployeeSkill(@PathVariable Long userId,
-                                                                  @Valid @RequestBody EmployeeSkillRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(skillService.addEmployeeSkill(userId, request));
+    @ResponseStatus(HttpStatus.CREATED)
+    public EmployeeSkillResponse addEmployeeSkill(@PathVariable Long userId,
+                                                  @Valid @RequestBody EmployeeSkillRequest request) {
+        return skillService.addEmployeeSkill(userId, request);
     }
 }

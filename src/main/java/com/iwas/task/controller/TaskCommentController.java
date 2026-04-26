@@ -7,7 +7,6 @@ import com.iwas.task.service.TaskCommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,32 +20,30 @@ public class TaskCommentController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping
-    public ResponseEntity<List<TaskCommentResponse>> getComments(@PathVariable Long taskId) {
-        return ResponseEntity.ok(taskCommentService.getCommentsByTask(taskId));
+    public List<TaskCommentResponse> getComments(@PathVariable Long taskId) {
+        return taskCommentService.getCommentsByTask(taskId);
     }
 
     @PostMapping
-    public ResponseEntity<TaskCommentResponse> addComment(
+    @ResponseStatus(HttpStatus.CREATED)
+    public TaskCommentResponse addComment(
             @PathVariable Long taskId,
             @Valid @RequestBody TaskCommentRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(taskCommentService.addComment(taskId, request, authenticatedUserResolver.currentUserId()));
+        return taskCommentService.addComment(taskId, request, authenticatedUserResolver.currentUserId());
     }
 
     @PostMapping("/{commentId}/update")
-    public ResponseEntity<TaskCommentResponse> updateComment(
+    public TaskCommentResponse updateComment(
             @PathVariable Long taskId,
             @PathVariable Long commentId,
             @Valid @RequestBody TaskCommentRequest request) {
-        return ResponseEntity.ok(
-                taskCommentService.updateComment(commentId, request, authenticatedUserResolver.currentUserId()));
+        return taskCommentService.updateComment(commentId, request, authenticatedUserResolver.currentUserId());
     }
 
     @PostMapping("/{commentId}/delete")
-    public ResponseEntity<Void> deleteComment(
+    public void deleteComment(
             @PathVariable Long taskId,
             @PathVariable Long commentId) {
         taskCommentService.deleteComment(commentId, authenticatedUserResolver.currentUserId());
-        return ResponseEntity.ok().build();
     }
 }

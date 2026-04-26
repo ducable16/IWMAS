@@ -39,6 +39,6 @@ app:
     base-url: http://localhost:5173
   jwt:
     secret: hs5p8JHcpEdoZeiE5uRIDCev4rMczXRP
-    access-expiration-ms: 900000
+    access-expiration-ms: 3600000
     refresh-expiration-ms: 604800000
     expiration: 86400000

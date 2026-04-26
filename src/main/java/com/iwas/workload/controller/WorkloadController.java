@@ -6,7 +6,6 @@ import com.iwas.workload.dto.WorkloadSnapshotResponse;
 import com.iwas.workload.service.WorkloadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,37 +22,37 @@ public class WorkloadController {
 
     @GetMapping("/team")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public ResponseEntity<List<WorkloadSnapshotResponse>> getTeamWorkload(
+    public List<WorkloadSnapshotResponse> getTeamWorkload(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(workloadService.getTeamWorkload(date));
+        return workloadService.getTeamWorkload(date);
     }
 
     @GetMapping("/me")
-    public ResponseEntity<List<WorkloadSnapshotResponse>> getMyWorkload() {
-        return ResponseEntity.ok(workloadService.getUserWorkloadHistory(authenticatedUserResolver.currentUserId()));
+    public List<WorkloadSnapshotResponse> getMyWorkload() {
+        return workloadService.getUserWorkloadHistory(authenticatedUserResolver.currentUserId());
     }
 
     @GetMapping("/users/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public ResponseEntity<List<WorkloadSnapshotResponse>> getUserWorkload(@PathVariable Long userId) {
-        return ResponseEntity.ok(workloadService.getUserWorkloadHistory(userId));
+    public List<WorkloadSnapshotResponse> getUserWorkload(@PathVariable Long userId) {
+        return workloadService.getUserWorkloadHistory(userId);
     }
 
     @PostMapping("/snapshot")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
-    public ResponseEntity<WorkloadSnapshotResponse> takeSnapshot(@RequestParam Long userId) {
-        return ResponseEntity.ok(workloadService.takeSnapshot(userId));
+    public WorkloadSnapshotResponse takeSnapshot(@RequestParam Long userId) {
+        return workloadService.takeSnapshot(userId);
     }
 
     @GetMapping("/burnout")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public ResponseEntity<List<BurnoutLogResponse>> getBurnoutLogs() {
-        return ResponseEntity.ok(workloadService.getBurnoutLogs());
+    public List<BurnoutLogResponse> getBurnoutLogs() {
+        return workloadService.getBurnoutLogs();
     }
 
     @GetMapping("/burnout/users/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public ResponseEntity<List<BurnoutLogResponse>> getUserBurnoutHistory(@PathVariable Long userId) {
-        return ResponseEntity.ok(workloadService.getUserBurnoutHistory(userId));
+    public List<BurnoutLogResponse> getUserBurnoutHistory(@PathVariable Long userId) {
+        return workloadService.getUserBurnoutHistory(userId);
     }
 }

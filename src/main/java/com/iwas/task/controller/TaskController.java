@@ -10,7 +10,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,7 +27,7 @@ public class TaskController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping
-    public ResponseEntity<TaskPageResponse> searchTasks(
+    public TaskPageResponse searchTasks(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) List<TaskStatus> statuses,
@@ -72,62 +71,61 @@ public class TaskController {
         filter.setSortDirection(sortDirection);
         filter.setPage(page);
         filter.setSize(size);
-        return ResponseEntity.ok(taskService.searchTasks(filter));
+        return taskService.searchTasks(filter);
     }
 
     @GetMapping("/board")
-    public ResponseEntity<KanbanBoardResponse> getKanbanBoard(@RequestParam Long projectId) {
-        return ResponseEntity.ok(taskService.getKanbanBoard(projectId));
+    public KanbanBoardResponse getKanbanBoard(@RequestParam Long projectId) {
+        return taskService.getKanbanBoard(projectId);
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<TaskResponse>> getMyTasks() {
-        return ResponseEntity.ok(taskService.getMyTasks(authenticatedUserResolver.currentUserId()));
+    public List<TaskResponse> getMyTasks() {
+        return taskService.getMyTasks(authenticatedUserResolver.currentUserId());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TaskResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(taskService.getTaskById(id));
+    public TaskResponse getById(@PathVariable Long id) {
+        return taskService.getTaskById(id);
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
-    public ResponseEntity<TaskResponse> create(@Valid @RequestBody TaskRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(taskService.createTask(request, authenticatedUserResolver.currentUserId()));
+    @ResponseStatus(HttpStatus.CREATED)
+    public TaskResponse create(@Valid @RequestBody TaskRequest request) {
+        return taskService.createTask(request, authenticatedUserResolver.currentUserId());
     }
 
     @PostMapping("/{id}/update")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
-    public ResponseEntity<TaskResponse> update(@PathVariable Long id,
-                                               @Valid @RequestBody TaskRequest request) {
-        return ResponseEntity.ok(taskService.updateTask(id, request));
+    public TaskResponse update(@PathVariable Long id,
+                               @Valid @RequestBody TaskRequest request) {
+        return taskService.updateTask(id, request);
     }
 
     @PostMapping("/{id}/status")
-    public ResponseEntity<TaskResponse> updateStatus(@PathVariable Long id,
-                                                     @Valid @RequestBody TaskStatusUpdateRequest request) {
-        return ResponseEntity.ok(taskService.updateTaskStatus(id, request, authenticatedUserResolver.currentUserId()));
+    public TaskResponse updateStatus(@PathVariable Long id,
+                                     @Valid @RequestBody TaskStatusUpdateRequest request) {
+        return taskService.updateTaskStatus(id, request, authenticatedUserResolver.currentUserId());
     }
 
     @PostMapping("/{id}/delete")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public void delete(@PathVariable Long id) {
         taskService.deleteTask(id);
-        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/calendar")
-    public ResponseEntity<List<CalendarDayResponse>> getCalendarView(
+    public List<CalendarDayResponse> getCalendarView(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long projectId
     ) {
-        return ResponseEntity.ok(taskService.getCalendarView(from, to, projectId));
+        return taskService.getCalendarView(from, to, projectId);
     }
 
     @GetMapping("/{id}/history")
-    public ResponseEntity<List<TaskStatusHistoryResponse>> getStatusHistory(@PathVariable Long id) {
-        return ResponseEntity.ok(taskService.getStatusHistory(id));
+    public List<TaskStatusHistoryResponse> getStatusHistory(@PathVariable Long id) {
+        return taskService.getStatusHistory(id);
     }
 }
