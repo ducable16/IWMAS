@@ -34,15 +34,16 @@ public class SkillController {
         return skillService.createSkill(request);
     }
 
-    @PostMapping("/{id}/update")
+    @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public SkillResponse updateSkill(@PathVariable Long id,
                                      @Valid @RequestBody SkillRequest request) {
         return skillService.updateSkill(id, request);
     }
 
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteSkill(@PathVariable Long id) {
         skillService.deleteSkill(id);
     }

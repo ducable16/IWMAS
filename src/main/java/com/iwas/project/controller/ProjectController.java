@@ -39,15 +39,16 @@ public class ProjectController {
         return projectService.createProject(request);
     }
 
-    @PostMapping("/{id}/update")
+    @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
     public ProjectResponse update(@PathVariable Long id,
                                   @Valid @RequestBody ProjectRequest request) {
         return projectService.updateProject(id, request);
     }
 
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         projectService.deleteProject(id);
     }
@@ -65,7 +66,7 @@ public class ProjectController {
         return projectService.addMember(id, request);
     }
 
-    @PostMapping("/{id}/members/{memberId}/update")
+    @PutMapping("/{id}/members/{memberId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
     public ProjectMemberResponse updateMember(@PathVariable Long id,
                                               @PathVariable Long memberId,
@@ -73,8 +74,9 @@ public class ProjectController {
         return projectService.updateMember(id, memberId, request);
     }
 
-    @PostMapping("/{id}/members/{memberId}/delete")
+    @DeleteMapping("/{id}/members/{memberId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeMember(@PathVariable Long id,
                              @PathVariable Long memberId) {
         projectService.removeMember(id, memberId);

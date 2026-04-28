@@ -28,12 +28,12 @@ public class UserController {
         return userService.getMe(authenticatedUserResolver.currentUserId());
     }
 
-    @PostMapping("/me/update")
+    @PatchMapping("/me")
     public UserMeResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         return userService.updateProfile(authenticatedUserResolver.currentUserId(), request);
     }
 
-    @PostMapping("/me/password")
+    @PatchMapping("/me/password")
     public String changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         return userService.changePassword(authenticatedUserResolver.currentUserId(), request);
     }
@@ -45,7 +45,7 @@ public class UserController {
         return userService.createUser(request);
     }
 
-    @PostMapping("/{id}/update")
+    @PatchMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
     public UserMeResponse updateUser(@PathVariable Long id,
                                      @Valid @RequestBody UpdateUserRequest request) {
@@ -63,13 +63,13 @@ public class UserController {
         return userService.getUserById(id);
     }
 
-    @PostMapping("/{id}/activate")
+    @PatchMapping("/{id}/activate")
     @PreAuthorize("hasRole('ADMIN')")
     public UserMeResponse activateUser(@PathVariable Long id) {
         return userService.toggleUserActive(id, true);
     }
 
-    @PostMapping("/{id}/deactivate")
+    @PatchMapping("/{id}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
     public UserMeResponse deactivateUser(@PathVariable Long id) {
         return userService.toggleUserActive(id, false);

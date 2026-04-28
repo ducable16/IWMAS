@@ -6,6 +6,7 @@ import com.iwas.workload.dto.WorkloadSnapshotResponse;
 import com.iwas.workload.service.WorkloadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,8 +39,9 @@ public class WorkloadController {
         return workloadService.getUserWorkloadHistory(userId);
     }
 
-    @PostMapping("/snapshot")
+    @PostMapping("/snapshots")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
+    @ResponseStatus(HttpStatus.CREATED)
     public WorkloadSnapshotResponse takeSnapshot(@RequestParam Long userId) {
         return workloadService.takeSnapshot(userId);
     }

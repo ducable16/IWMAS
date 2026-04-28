@@ -33,12 +33,12 @@ public class NotificationController {
         return Map.of("count", notificationService.countUnread(authenticatedUserResolver.currentUserId()));
     }
 
-    @PostMapping("/{id}/read")
+    @PatchMapping("/{id}/read")
     public NotificationResponse markAsRead(@PathVariable Long id) {
         return notificationService.markAsRead(authenticatedUserResolver.currentUserId(), id);
     }
 
-    @PostMapping("/read-all")
+    @PatchMapping("/read-all")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void markAllAsRead() {
         notificationService.markAllAsRead(authenticatedUserResolver.currentUserId());

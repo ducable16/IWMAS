@@ -39,13 +39,14 @@ public class TimeLogController {
         return timeLogService.logTime(authenticatedUserResolver.currentUserId(), request);
     }
 
-    @PostMapping("/{id}/update")
+    @PutMapping("/{id}")
     public TimeLogResponse update(@PathVariable Long id,
                                   @Valid @RequestBody TimeLogRequest request) {
         return timeLogService.updateLog(authenticatedUserResolver.currentUserId(), id, request);
     }
 
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         timeLogService.deleteLog(authenticatedUserResolver.currentUserId(), id);
     }

@@ -32,7 +32,7 @@ public class TaskCommentController {
         return taskCommentService.addComment(taskId, request, authenticatedUserResolver.currentUserId());
     }
 
-    @PostMapping("/{commentId}/update")
+    @PutMapping("/{commentId}")
     public TaskCommentResponse updateComment(
             @PathVariable Long taskId,
             @PathVariable Long commentId,
@@ -40,7 +40,8 @@ public class TaskCommentController {
         return taskCommentService.updateComment(commentId, request, authenticatedUserResolver.currentUserId());
     }
 
-    @PostMapping("/{commentId}/delete")
+    @DeleteMapping("/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteComment(
             @PathVariable Long taskId,
             @PathVariable Long commentId) {

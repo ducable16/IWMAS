@@ -96,21 +96,22 @@ public class TaskController {
         return taskService.createTask(request, authenticatedUserResolver.currentUserId());
     }
 
-    @PostMapping("/{id}/update")
+    @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
     public TaskResponse update(@PathVariable Long id,
                                @Valid @RequestBody TaskRequest request) {
         return taskService.updateTask(id, request);
     }
 
-    @PostMapping("/{id}/status")
+    @PatchMapping("/{id}/status")
     public TaskResponse updateStatus(@PathVariable Long id,
                                      @Valid @RequestBody TaskStatusUpdateRequest request) {
         return taskService.updateTaskStatus(id, request, authenticatedUserResolver.currentUserId());
     }
 
-    @PostMapping("/{id}/delete")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         taskService.deleteTask(id);
     }

@@ -36,13 +36,14 @@ public class EmployeeSkillController {
         return skillService.addEmployeeSkill(authenticatedUserResolver.currentUserId(), request);
     }
 
-    @PostMapping("/me/skills/{skillId}/update")
+    @PutMapping("/me/skills/{skillId}")
     public EmployeeSkillResponse updateMySkill(@PathVariable Long skillId,
                                                @Valid @RequestBody EmployeeSkillRequest request) {
         return skillService.updateEmployeeSkill(authenticatedUserResolver.currentUserId(), skillId, request);
     }
 
-    @PostMapping("/me/skills/{skillId}/delete")
+    @DeleteMapping("/me/skills/{skillId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeMySkill(@PathVariable Long skillId) {
         skillService.removeEmployeeSkill(authenticatedUserResolver.currentUserId(), skillId);
     }
