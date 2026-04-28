@@ -7,16 +7,21 @@ import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
 import com.iwas.user.dto.CreateUserRequest;
 import com.iwas.user.dto.UpdateUserRequest;
+import com.iwas.user.dto.UserFilterRequest;
 import com.iwas.user.dto.UserMeResponse;
+import com.iwas.user.dto.UserPageResponse;
 import com.iwas.user.entity.User;
 import com.iwas.user.enums.UserRole;
+import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
+import com.iwas.user.repository.UserSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -93,14 +98,43 @@ public class UserService {
         return authService.toMeResponse(userRepository.save(user));
     }
 
-    public List<UserMeResponse> getAllUsers() {
-        return userRepository.findAllActiveUsers().stream()
-                .map(authService::toMeResponse)
-                .toList();
+    public UserPageResponse getAllUsers(UserFilterRequest filter, UserRole callerRole) {
+        int size = Math.min(filter.getSize(), 100);
+        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
+        PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
+
+        Page<User> page = userRepository.findAll(UserSpecification.fromFilter(filter), pageRequest);
+
+        return UserPageResponse.builder()
+                .content(page.getContent().stream().map(u -> mapByRole(u, callerRole)).toList())
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
     }
 
-    public UserMeResponse getUserById(Long userId) {
-        return authService.toMeResponse(findUser(userId));
+    private Sort buildSort(String sortBy, String direction) {
+        Sort.Direction dir = "ASC".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String field = switch (sortBy == null ? "" : sortBy.toLowerCase()) {
+            case "email" -> "email";
+            case "createdat", "created_at" -> "createdAt";
+            case "lastloginat", "last_login_at" -> "lastLoginAt";
+            default -> "fullName";
+        };
+        return Sort.by(dir, field);
+    }
+
+    public Object getUserById(Long userId, UserRole callerRole) {
+        return mapByRole(findUser(userId), callerRole);
+    }
+
+    private Object mapByRole(User user, UserRole role) {
+        return switch (role) {
+            case ADMIN -> UserMapper.toAdminView(user);
+            case HR -> UserMapper.toHRView(user);
+            default -> UserMapper.toPublicView(user);
+        };
     }
 
     @Transactional

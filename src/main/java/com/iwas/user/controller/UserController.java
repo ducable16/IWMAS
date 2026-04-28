@@ -5,15 +5,16 @@ import com.iwas.auth.dto.UpdateProfileRequest;
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.user.dto.CreateUserRequest;
 import com.iwas.user.dto.UpdateUserRequest;
+import com.iwas.user.dto.UserFilterRequest;
 import com.iwas.user.dto.UserMeResponse;
+import com.iwas.user.dto.UserPageResponse;
+import com.iwas.user.enums.UserRole;
 import com.iwas.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -53,14 +54,15 @@ public class UserController {
     }
 
     @GetMapping
-    public List<UserMeResponse> getAllUsers() {
-        return userService.getAllUsers();
+    public UserPageResponse getAllUsers(@ModelAttribute UserFilterRequest filter) {
+        UserRole callerRole = UserRole.valueOf(authenticatedUserResolver.currentUserRole());
+        return userService.getAllUsers(filter, callerRole);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public UserMeResponse getUserById(@PathVariable Long id) {
-        return userService.getUserById(id);
+    public Object getUserById(@PathVariable Long id) {
+        UserRole callerRole = UserRole.valueOf(authenticatedUserResolver.currentUserRole());
+        return userService.getUserById(id, callerRole);
     }
 
     @PatchMapping("/{id}/activate")
