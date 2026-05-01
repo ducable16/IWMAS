@@ -1,8 +1,8 @@
 package com.iwas.project.controller;
 
 import com.iwas.project.dto.*;
-import com.iwas.project.enums.ProjectStatus;
 import com.iwas.project.service.ProjectService;
+import com.iwas.security.AuthenticatedUserResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,14 +17,17 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping
-    public List<ProjectResponse> getAllProjects(
-            @RequestParam(required = false) ProjectStatus status) {
-        if (status != null) {
-            return projectService.getProjectsByStatus(status);
-        }
-        return projectService.getAllProjects();
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    public ProjectPageResponse getAllProjects(@ModelAttribute ProjectFilterRequest filter) {
+        return projectService.searchProjects(filter);
+    }
+
+    @GetMapping("/my")
+    public ProjectPageResponse getMyProjects(@ModelAttribute ProjectFilterRequest filter) {
+        return projectService.searchMyProjects(authenticatedUserResolver.currentUserId(), filter);
     }
 
     @GetMapping("/{id}")

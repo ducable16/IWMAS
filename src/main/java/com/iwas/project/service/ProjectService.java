@@ -5,12 +5,15 @@ import com.iwas.common.exception.AppException;
 import com.iwas.project.dto.*;
 import com.iwas.project.entity.Project;
 import com.iwas.project.entity.ProjectMember;
-import com.iwas.project.enums.ProjectStatus;
 import com.iwas.project.repository.ProjectMemberRepository;
 import com.iwas.project.repository.ProjectRepository;
+import com.iwas.project.repository.ProjectSpecification;
 import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,16 +29,52 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
 
-    public List<ProjectResponse> getAllProjects() {
-        return projectRepository.findAllActive().stream()
+    public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
+        int size = Math.min(filter.getSize(), 100);
+        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
+        PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
+
+        Page<Project> page = projectRepository.findAll(ProjectSpecification.fromFilter(filter), pageRequest);
+
+        List<ProjectResponse> content = page.getContent().stream()
                 .map(this::toProjectResponse)
                 .toList();
+        return ProjectPageResponse.builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
     }
 
-    public List<ProjectResponse> getProjectsByStatus(ProjectStatus status) {
-        return projectRepository.findByStatus(status).stream()
+    public ProjectPageResponse searchMyProjects(Long userId, ProjectFilterRequest filter) {
+        List<Long> projectIds = projectMemberRepository.findActiveProjectsByUserId(userId)
+                .stream().map(ProjectMember::getProjectId).toList();
+        if (projectIds.isEmpty()) {
+            return ProjectPageResponse.builder()
+                    .content(List.of()).page(filter.getPage()).size(filter.getSize())
+                    .totalElements(0).totalPages(0).build();
+        }
+
+        int size = Math.min(filter.getSize(), 100);
+        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
+        PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
+
+        var spec = ProjectSpecification.fromFilter(filter)
+                .and((root, query, cb) -> root.get("id").in(projectIds));
+        Page<Project> page = projectRepository.findAll(spec, pageRequest);
+
+        List<ProjectResponse> content = page.getContent().stream()
                 .map(this::toProjectResponse)
                 .toList();
+        return ProjectPageResponse.builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
     }
 
     public ProjectResponse getProjectById(Long id) {
@@ -170,5 +209,19 @@ public class ProjectService {
                 .leaveDate(pm.getLeaveDate())
                 .note(pm.getNote())
                 .build();
+    }
+
+    private Sort buildSort(String sortBy, String direction) {
+        Sort.Direction dir = "ASC".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String field = switch (sortBy == null ? "" : sortBy.toLowerCase()) {
+            case "name" -> "name";
+            case "status" -> "status";
+            case "priority" -> "priority";
+            case "startdate", "start_date" -> "startDate";
+            case "enddate", "end_date" -> "endDate";
+            case "updatedat", "updated_at" -> "updatedAt";
+            default -> "createdAt";
+        };
+        return Sort.by(dir, field);
     }
 }
