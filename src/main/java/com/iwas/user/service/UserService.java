@@ -2,7 +2,7 @@ package com.iwas.user.service;
 
 import com.iwas.auth.dto.ChangePasswordRequest;
 import com.iwas.auth.dto.UpdateProfileRequest;
-import com.iwas.auth.AuthService;
+import com.iwas.auth.service.AuthService;
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
 import com.iwas.user.dto.CreateUserRequest;

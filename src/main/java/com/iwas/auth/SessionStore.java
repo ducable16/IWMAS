@@ -1,5 +1,6 @@
 package com.iwas.auth;
 
+import com.iwas.auth.entity.SessionEntry;
 import com.iwas.user.entity.User;
 import org.springframework.stereotype.Component;
 

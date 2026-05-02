@@ -62,6 +62,11 @@ public enum ErrorCode {
 
     // --- 8xxx: Workload ---
     WORKLOAD_SNAPSHOT_NOT_FOUND(8001, "Workload snapshot not found", HttpStatus.NOT_FOUND),
+
+    // --- 95xx: Search ---
+    SEARCH_QUERY_TOO_SHORT(9501, "Search query too short", HttpStatus.BAD_REQUEST),
+    SEARCH_BACKEND_UNAVAILABLE(9502, "Search backend unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    SEARCH_INDEX_FAILED(9503, "Failed to index document", HttpStatus.INTERNAL_SERVER_ERROR),
     ;
 
     private final int code;

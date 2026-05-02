@@ -1,4 +1,4 @@
-package com.iwas.auth;
+package com.iwas.auth.service;
 
 import org.springframework.stereotype.Service;
 

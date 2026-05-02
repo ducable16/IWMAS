@@ -1,4 +1,4 @@
-package com.iwas.auth;
+package com.iwas.auth.service;
 
 import com.iwas.auth.entity.RefreshToken;
 import com.iwas.auth.repository.RefreshTokenRepository;

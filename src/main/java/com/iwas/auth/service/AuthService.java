@@ -1,5 +1,6 @@
-package com.iwas.auth;
+package com.iwas.auth.service;
 
+import com.iwas.auth.*;
 import com.iwas.auth.dto.AuthResponse;
 import com.iwas.auth.dto.ForgotPasswordRequest;
 import com.iwas.auth.dto.LoginRequest;
@@ -7,11 +8,10 @@ import com.iwas.auth.dto.RegisterRequest;
 import com.iwas.auth.dto.ResetPasswordRequest;
 import com.iwas.auth.dto.SendOtpRequest;
 import com.iwas.auth.dto.VerifyOtpRequest;
+import com.iwas.auth.entity.*;
+import com.iwas.common.mesaging.publisher.EmailNotificationPublisher;
 import com.iwas.user.dto.UserMeResponse;
 import com.iwas.common.enums.ErrorCode;
-import com.iwas.auth.entity.EmailVerification;
-import com.iwas.auth.entity.OtpVerification;
-import com.iwas.auth.entity.PasswordReset;
 import com.iwas.user.entity.User;
 import com.iwas.common.exception.AppException;
 import com.iwas.auth.repository.EmailVerificationRepository;
@@ -39,7 +39,7 @@ public class AuthService {
     private final SessionStore sessionStore;
     private final PasswordEncoder passwordEncoder;
     private final TokenHashingService tokenHashingService;
-//    private final EmailNotificationProducer emailNotificationProducer;
+    private final EmailNotificationPublisher emailNotificationPublisher;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
@@ -69,12 +69,12 @@ public class AuthService {
         verification.setExpiresAt(LocalDateTime.now().plusHours(24));
         emailVerificationRepository.save(verification);
 
-//        emailNotificationProducer.publish(EmailMessage.builder()
-//                .to(user.getEmail())
-//                .subject("Verify your Workforce account")
-//                .template("email-verification")
-//                .token(rawToken)
-//                .build());
+        emailNotificationPublisher.publish(EmailMessage.builder()
+                .to(user.getEmail())
+                .subject("Verify your Workforce account")
+                .template("email-verification")
+                .token(rawToken)
+                .build());
 
         return "Check your email to verify your account";
     }
@@ -165,12 +165,12 @@ public class AuthService {
             reset.setExpiresAt(LocalDateTime.now().plusHours(1));
             passwordResetRepository.save(reset);
 
-//            emailNotificationProducer.publish(EmailMessage.builder()
-//                    .to(user.getEmail())
-//                    .subject("Reset your Workforce password")
-//                    .template("password-reset")
-//                    .token(rawToken)
-//                    .build());
+            emailNotificationPublisher.publish(EmailMessage.builder()
+                    .to(user.getEmail())
+                    .subject("Reset your Workforce password")
+                    .template("password-reset")
+                    .token(rawToken)
+                    .build());
         });
         return "If the email exists, a reset instruction has been sent";
     }
@@ -209,12 +209,12 @@ public class AuthService {
         otpVerification.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
         otpVerificationRepository.save(otpVerification);
 
-//        emailNotificationProducer.publish(EmailMessage.builder()
-//                .to(user.getEmail())
-//                .subject("Your Workforce verification code")
-//                .template("email-otp")
-//                .token(rawOtp)
-//                .build());
+        emailNotificationPublisher.publish(EmailMessage.builder()
+                .to(user.getEmail())
+                .subject("Your Workforce verification code")
+                .template("email-otp")
+                .token(rawOtp)
+                .build());
 
         return "OTP has been sent to your email";
     }

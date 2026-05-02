@@ -1,4 +1,4 @@
-package com.iwas.auth;
+package com.iwas.auth.entity;
 
 import lombok.Builder;
 import lombok.Data;

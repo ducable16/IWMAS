@@ -15,6 +15,23 @@ spring:
     port: 5672
     username: admin
     password: admin
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 500ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+    elasticsearch:
+      repositories:
+        enabled: true
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 1s
+    socket-timeout: 3s
   mail:
     username: toilaatmin@gmail.com
     password: laijaybhzvszxfdz
@@ -31,10 +48,24 @@ server:
   port: 9090
 
 app:
+  logging:
+    logstash:
+      host: localhost
+      port: 5000
   mail:
     from: toilaatmin@gmail.com
   rabbitmq:
     email-queue: email.verification
+    search-sync-queue: iwas.search.sync
+    search-sync-exchange: iwas.search.sync.exchange
+  search:
+    autocomplete:
+      max-suggestions: 10
+      cache-ttl-seconds: 60
+      min-prefix-length: 2
+    elasticsearch:
+      user-index: iwas-users
+      max-page-size: 50
   frontend:
     base-url: http://localhost:5173
   jwt:

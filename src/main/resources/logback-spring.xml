@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="iwas"/>
+    <springProperty scope="context" name="logstashHost" source="app.logging.logstash.host" defaultValue="localhost"/>
+    <springProperty scope="context" name="logstashPort" source="app.logging.logstash.port" defaultValue="5000"/>
+
+    <!-- Console for local dev -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Generic JSON encoder shared by ship appenders -->
+    <appender name="LOGSTASH_APP" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${logstashHost}:${logstashPort}</destination>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+        <reconnectionDelay>10 seconds</reconnectionDelay>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>sessionId</includeMdcKeyName>
+            <customFields>{"service":"${appName}","stream":"app"}</customFields>
+        </encoder>
+        <!-- Only ship WARN/ERROR to keep app-errors index lean -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+    </appender>
+
+    <!-- Search-events stream: every INFO+ from com.iwas.search.* -->
+    <appender name="LOGSTASH_SEARCH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${logstashHost}:${logstashPort}</destination>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+        <reconnectionDelay>10 seconds</reconnectionDelay>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>queryId</includeMdcKeyName>
+            <includeMdcKeyName>queryRaw</includeMdcKeyName>
+            <includeMdcKeyName>path</includeMdcKeyName>
+            <includeMdcKeyName>latencyMs</includeMdcKeyName>
+            <includeMdcKeyName>resultCount</includeMdcKeyName>
+            <includeMdcKeyName>cacheHit</includeMdcKeyName>
+            <customFields>{"service":"${appName}","stream":"search"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- Dedicated logger for search analytics; do NOT bubble to root -->
+    <logger name="com.iwas.search.analytics" level="INFO" additivity="false">
+        <appender-ref ref="LOGSTASH_SEARCH"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- Mute SQL noise from being shipped (still visible in console if show-sql=true) -->
+    <logger name="org.hibernate.SQL" level="INFO"/>
+    <logger name="org.hibernate.orm.jdbc.bind" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="LOGSTASH_APP"/>
+    </root>
+
+</configuration>
