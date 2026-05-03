@@ -47,6 +47,7 @@ public enum ErrorCode {
     PROJECT_CODE_ALREADY_EXISTS(4002, "Project code already exists", HttpStatus.CONFLICT),
     PROJECT_MEMBER_NOT_FOUND(4003, "Project member not found", HttpStatus.NOT_FOUND),
     PROJECT_MEMBER_ALREADY_EXISTS(4004, "User is already a member of this project", HttpStatus.CONFLICT),
+    USER_OVER_ALLOCATED(4005, "User's total allocation across active projects would exceed 100%", HttpStatus.CONFLICT),
 
     // --- 5xxx: Tasks ---
     TASK_NOT_FOUND(5001, "Task not found", HttpStatus.NOT_FOUND),

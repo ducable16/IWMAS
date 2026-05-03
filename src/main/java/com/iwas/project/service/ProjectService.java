@@ -166,6 +166,8 @@ public class ProjectService {
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, request.getUserId())
                 .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
 
+        checkAllocationLimit(request.getUserId(), request.getAllocatedEffortPercent(), null);
+
         ProjectMember member = new ProjectMember();
         member.setProjectId(projectId);
         member.setUserId(request.getUserId());
@@ -185,6 +187,8 @@ public class ProjectService {
                 .filter(pm -> pm.getProjectId().equals(projectId) && !Boolean.TRUE.equals(pm.getIsDeleted()))
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_MEMBER_NOT_FOUND));
 
+        checkAllocationLimit(member.getUserId(), request.getAllocatedEffortPercent(), memberId);
+
         member.setRoleInProject(request.getRoleInProject());
         member.setAllocatedEffortPercent(request.getAllocatedEffortPercent());
         member.setNote(request.getNote());
@@ -192,6 +196,28 @@ public class ProjectService {
         String userName = userRepository.findById(member.getUserId())
                 .map(User::getFullName).orElse(null);
         return toMemberResponse(projectMemberRepository.save(member), userName);
+    }
+
+    /**
+     * Acquires a row-level lock on the user row, then validates that adding
+     * newAllocation% would not push the user's total active allocation above 100%.
+     * The lock serializes concurrent allocation changes for the same user within
+     * the surrounding @Transactional boundary.
+     */
+    private void checkAllocationLimit(Long userId, Integer newAllocation, Long excludeMemberId) {
+        if (newAllocation == null || newAllocation == 0) return;
+
+        userRepository.findByIdWithLock(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        Long current = excludeMemberId == null
+                ? projectMemberRepository.sumActiveAllocationByUserId(userId)
+                : projectMemberRepository.sumActiveAllocationExcluding(userId, excludeMemberId);
+
+        long currentTotal = current == null ? 0L : current;
+        if (currentTotal + newAllocation > 100) {
+            throw new AppException(ErrorCode.USER_OVER_ALLOCATED);
+        }
     }
 
     @Transactional
