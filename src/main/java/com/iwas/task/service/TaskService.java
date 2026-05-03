@@ -2,6 +2,8 @@ package com.iwas.task.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.project.service.ProjectService;
+import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.skill.entity.Skill;
 import com.iwas.skill.repository.SkillRepository;
 import com.iwas.task.dto.*;
@@ -44,12 +46,19 @@ public class TaskService {
     private final TaskStatusHistoryRepository taskStatusHistoryRepository;
     private final SkillRepository skillRepository;
     private final UserRepository userRepository;
+    private final ProjectService projectService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @Lazy
     @Autowired
     private TaskCommentService taskCommentService;
 
+    @Lazy
+    @Autowired
+    private TaskService self;
+
     public List<TaskResponse> getTasksByProject(Long projectId) {
+        projectService.requireProjectAccess(projectId);
         List<Task> tasks = taskRepository.findByProjectId(projectId);
         return toResponseList(tasks);
     }
@@ -61,17 +70,31 @@ public class TaskService {
 
     public TaskResponse getTaskById(Long id) {
         Task task = findTask(id);
+        projectService.requireProjectAccess(task.getProjectId());
         return toDetailResponse(task);
     }
 
     public TaskPageResponse searchTasks(TaskFilterRequest filter) {
+        if (filter.getProjectId() != null) {
+            projectService.requireProjectAccess(filter.getProjectId());
+        }
+
         int size = Math.min(filter.getSize(), 100);
         Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
         PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
 
         Specification<Task> spec = TaskSpecification.fromFilter(filter);
-        Page<Task> page = taskRepository.findAll(spec, pageRequest);
+        if (filter.getProjectId() == null) {
+            Specification<Task> filtered = applyAccessFilter(spec);
+            if (filtered == null) {
+                return TaskPageResponse.builder()
+                        .content(List.of()).page(filter.getPage()).size(size)
+                        .totalElements(0).totalPages(0).build();
+            }
+            spec = filtered;
+        }
 
+        Page<Task> page = taskRepository.findAll(spec, pageRequest);
         List<TaskResponse> content = toResponseList(page.getContent());
         return TaskPageResponse.builder()
                 .content(content)
@@ -82,8 +105,14 @@ public class TaskService {
                 .build();
     }
 
-    @Cacheable(value = "kanbanBoard", key = "#projectId")
+    // Access-check wrapper — delegates to the cached implementation via proxy
     public KanbanBoardResponse getKanbanBoard(Long projectId) {
+        projectService.requireProjectAccess(projectId);
+        return self.getKanbanBoardCached(projectId);
+    }
+
+    @Cacheable(value = "kanbanBoard", key = "#projectId")
+    public KanbanBoardResponse getKanbanBoardCached(Long projectId) {
         List<Task> tasks = taskRepository.findAll(TaskSpecification.byProjectId(projectId));
         Map<TaskStatus, List<Task>> grouped = tasks.stream()
                 .collect(Collectors.groupingBy(Task::getStatus));
@@ -126,6 +155,7 @@ public class TaskService {
     @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse updateTask(Long id, TaskRequest request) {
         Task task = findTask(id);
+        requireTaskEditAccess(task);
         applyRequest(task, request);
         task = taskRepository.save(task);
 
@@ -144,6 +174,7 @@ public class TaskService {
     })
     public TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request, Long changedById) {
         Task task = findTask(id);
+        requireTaskEditAccess(task);
 
         if (!task.getStatus().canTransitionTo(request.getStatus())) {
             throw new AppException(ErrorCode.TASK_INVALID_STATUS_TRANSITION);
@@ -175,9 +206,15 @@ public class TaskService {
         taskRepository.save(task);
     }
 
-    @Cacheable(value = "taskStatusHistory", key = "#taskId")
+    // Access-check wrapper — delegates to the cached implementation via proxy
     public List<TaskStatusHistoryResponse> getStatusHistory(Long taskId) {
-        findTask(taskId);
+        Task task = findTask(taskId);
+        projectService.requireProjectAccess(task.getProjectId());
+        return self.getStatusHistoryCached(taskId);
+    }
+
+    @Cacheable(value = "taskStatusHistory", key = "#taskId")
+    public List<TaskStatusHistoryResponse> getStatusHistoryCached(Long taskId) {
         return taskStatusHistoryRepository.findByTaskIdOrderByChangedAtAsc(taskId).stream()
                 .map(h -> TaskStatusHistoryResponse.builder()
                         .id(h.getId())
@@ -189,6 +226,62 @@ public class TaskService {
                         .build())
                 .toList();
     }
+
+    public List<CalendarDayResponse> getCalendarView(LocalDate from, LocalDate to, Long projectId) {
+        if (projectId != null) {
+            projectService.requireProjectAccess(projectId);
+        }
+
+        Specification<Task> spec = TaskSpecification.forCalendar(from, to, projectId);
+        if (projectId == null) {
+            Specification<Task> filtered = applyAccessFilter(spec);
+            if (filtered == null) return Collections.emptyList();
+            spec = filtered;
+        }
+
+        List<Task> tasks = taskRepository.findAll(spec);
+        Map<LocalDate, List<Task>> grouped = tasks.stream()
+                .collect(Collectors.groupingBy(Task::getDueDate));
+
+        return from.datesUntil(to.plusDays(1))
+                .filter(grouped::containsKey)
+                .map(date -> {
+                    List<TaskResponse> dayTasks = toResponseList(grouped.get(date));
+                    return CalendarDayResponse.builder()
+                            .date(date)
+                            .tasks(dayTasks)
+                            .count(dayTasks.size())
+                            .build();
+                })
+                .toList();
+    }
+
+    // --- Access control helpers ---
+
+    private void requireTaskEditAccess(Task task) {
+        String role = authenticatedUserResolver.currentUserRole();
+        if ("ADMIN".equals(role)) return;
+        Long userId = authenticatedUserResolver.currentUserId();
+        boolean isPM = projectService.isManagerOf(task.getProjectId(), userId);
+        boolean isAssignee = userId.equals(task.getAssigneeId());
+        if (!isPM && !isAssignee) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+    }
+
+    /**
+     * Returns a spec restricted to the current user's accessible projects.
+     * Returns null when the user has no accessible projects (empty result).
+     * Returns the original spec unchanged when the user is ADMIN.
+     */
+    private Specification<Task> applyAccessFilter(Specification<Task> spec) {
+        List<Long> accessibleIds = projectService.getAccessibleProjectIds();
+        if (accessibleIds == null) return spec;
+        if (accessibleIds.isEmpty()) return null;
+        return spec.and((root, query, cb) -> root.get("projectId").in(accessibleIds));
+    }
+
+    // --- Private helpers ---
 
     private void applyRequest(Task task, TaskRequest request) {
         task.setProjectId(request.getProjectId());
@@ -338,25 +431,6 @@ public class TaskService {
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .build();
-    }
-
-    public List<CalendarDayResponse> getCalendarView(LocalDate from, LocalDate to, Long projectId) {
-        List<Task> tasks = taskRepository.findAll(TaskSpecification.forCalendar(from, to, projectId));
-
-        Map<LocalDate, List<Task>> grouped = tasks.stream()
-                .collect(Collectors.groupingBy(Task::getDueDate));
-
-        return from.datesUntil(to.plusDays(1))
-                .filter(grouped::containsKey)
-                .map(date -> {
-                    List<TaskResponse> dayTasks = toResponseList(grouped.get(date));
-                    return CalendarDayResponse.builder()
-                            .date(date)
-                            .tasks(dayTasks)
-                            .count(dayTasks.size())
-                            .build();
-                })
-                .toList();
     }
 
     private Sort buildSort(String sortBy, String direction) {

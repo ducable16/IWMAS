@@ -97,7 +97,6 @@ public class TaskController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
     public TaskResponse update(@PathVariable Long id,
                                @Valid @RequestBody TaskRequest request) {
         return taskService.updateTask(id, request);

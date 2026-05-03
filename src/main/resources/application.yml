@@ -73,3 +73,7 @@ app:
     access-expiration-ms: 3600000
     refresh-expiration-ms: 604800000
     expiration: 86400000
+
+logging:
+    level:
+        org.hibernate: ERROR

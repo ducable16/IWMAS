@@ -5,12 +5,14 @@
     <springProperty scope="context" name="logstashHost" source="app.logging.logstash.host" defaultValue="localhost"/>
     <springProperty scope="context" name="logstashPort" source="app.logging.logstash.port" defaultValue="5000"/>
 
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
     <!-- Console for local dev -->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
+<!--    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">-->
+<!--        <encoder>-->
+<!--            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>-->
+<!--        </encoder>-->
+<!--    </appender>-->
 
     <!-- Generic JSON encoder shared by ship appenders -->
     <appender name="LOGSTASH_APP" class="net.logstash.logback.appender.LogstashTcpSocketAppender">

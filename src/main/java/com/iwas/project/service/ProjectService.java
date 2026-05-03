@@ -8,6 +8,7 @@ import com.iwas.project.entity.ProjectMember;
 import com.iwas.project.repository.ProjectMemberRepository;
 import com.iwas.project.repository.ProjectRepository;
 import com.iwas.project.repository.ProjectSpecification;
+import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -28,8 +30,15 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
+        String role = authenticatedUserResolver.currentUserRole();
+        if ("PROJECT_MANAGER".equals(role)) {
+            // PM sees only projects they manage
+            filter.setManagerId(authenticatedUserResolver.currentUserId());
+        }
+
         int size = Math.min(filter.getSize(), 100);
         Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
         PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
@@ -78,7 +87,9 @@ public class ProjectService {
     }
 
     public ProjectResponse getProjectById(Long id) {
-        return toProjectResponse(findProject(id));
+        Project project = findProject(id);
+        requireProjectAccess(id);
+        return toProjectResponse(project);
     }
 
     @Transactional
@@ -122,6 +133,7 @@ public class ProjectService {
 
     public List<ProjectMemberResponse> getProjectMembers(Long projectId) {
         findProject(projectId);
+        requireProjectAccess(projectId);
         List<ProjectMember> members = projectMemberRepository.findByProjectId(projectId);
         Map<Long, String> userNames = userRepository.findAllById(
                 members.stream().map(ProjectMember::getUserId).toList()
@@ -174,6 +186,48 @@ public class ProjectService {
         member.setIsDeleted(true);
         projectMemberRepository.save(member);
     }
+
+    // --- Access control helpers ---
+
+    public boolean isManagerOf(Long projectId, Long userId) {
+        return projectRepository.findById(projectId)
+                .filter(p -> !Boolean.TRUE.equals(p.getIsDeleted()))
+                .map(p -> userId.equals(p.getManagerId()))
+                .orElse(false);
+    }
+
+    public boolean isMemberOf(Long projectId, Long userId) {
+        return projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, userId).isPresent();
+    }
+
+    public void requireProjectAccess(Long projectId) {
+        String role = authenticatedUserResolver.currentUserRole();
+        if ("ADMIN".equals(role)) return;
+        Long userId = authenticatedUserResolver.currentUserId();
+        if (!isManagerOf(projectId, userId) && !isMemberOf(projectId, userId)) {
+            throw new AppException(ErrorCode.FORBIDDEN);
+        }
+    }
+
+    /**
+     * Returns the IDs of projects the current user may access.
+     * Returns null for ADMIN (no filter needed — all projects accessible).
+     */
+    public List<Long> getAccessibleProjectIds() {
+        String role = authenticatedUserResolver.currentUserRole();
+        if ("ADMIN".equals(role)) return null;
+        Long userId = authenticatedUserResolver.currentUserId();
+        List<Long> memberIds = projectMemberRepository.findActiveProjectsByUserId(userId)
+                .stream().map(ProjectMember::getProjectId).toList();
+        if ("PROJECT_MANAGER".equals(role)) {
+            List<Long> managedIds = projectRepository.findByManagerId(userId)
+                    .stream().map(Project::getId).toList();
+            return Stream.concat(memberIds.stream(), managedIds.stream()).distinct().toList();
+        }
+        return memberIds;
+    }
+
+    // --- Private helpers ---
 
     private Project findProject(Long id) {
         return projectRepository.findById(id)
