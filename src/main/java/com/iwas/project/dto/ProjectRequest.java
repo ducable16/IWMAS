@@ -1,6 +1,5 @@
 package com.iwas.project.dto;
 
-import com.iwas.project.enums.ProjectPriority;
 import com.iwas.project.enums.ProjectStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,8 +21,6 @@ public class ProjectRequest {
     private String description;
 
     private ProjectStatus status = ProjectStatus.PLANNING;
-
-    private ProjectPriority priority = ProjectPriority.MEDIUM;
 
     private LocalDate startDate;
 

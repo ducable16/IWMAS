@@ -1,7 +1,6 @@
 package com.iwas.project.entity;
 
 import com.iwas.common.entity.BaseEntity;
-import com.iwas.project.enums.ProjectPriority;
 import com.iwas.project.enums.ProjectStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -36,10 +35,6 @@ public class Project extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private ProjectStatus status = ProjectStatus.PLANNING;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "priority", length = 20)
-    private ProjectPriority priority = ProjectPriority.MEDIUM;
 
     @Column(name = "start_date")
     private LocalDate startDate;

@@ -30,10 +30,6 @@ public class ProjectSpecification {
                 predicates.add(root.get("status").in(filter.getStatuses()));
             }
 
-            if (filter.getPriorities() != null && !filter.getPriorities().isEmpty()) {
-                predicates.add(root.get("priority").in(filter.getPriorities()));
-            }
-
             if (filter.getManagerId() != null) {
                 predicates.add(cb.equal(root.get("managerId"), filter.getManagerId()));
             }

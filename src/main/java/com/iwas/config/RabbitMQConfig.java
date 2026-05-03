@@ -18,9 +18,13 @@ public class RabbitMQConfig {
     public static final String EMAIL_EXCHANGE = "email.exchange";
     public static final String EMAIL_ROUTING_KEY = "email.verify";
 
-    public static final String SEARCH_QUEUE = "search.sync";
-    public static final String SEARCH_EXCHANGE = "search.exchange";
-    public static final String SEARCH_ROUTING_KEY = "search.user";
+    public static final String SEARCH_USER_QUEUE = "search.user.sync";
+    public static final String SEARCH_USER_EXCHANGE = "search.user.exchange";
+    public static final String SEARCH_USER_ROUTING_KEY = "search.user";
+
+    public static final String SEARCH_PROJECT_QUEUE = "search.project.sync";
+    public static final String SEARCH_PROJECT_EXCHANGE = "search.project.exchange";
+    public static final String SEARCH_PROJECT_ROUTING_KEY = "search.project";
 
     @Bean
     public MessageConverter messageConverter() {
@@ -68,21 +72,39 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Queue searchQueue() {
-        return new Queue(SEARCH_QUEUE, true);
+    public Queue searchUserQueue() {
+        return new Queue(SEARCH_USER_QUEUE, true);
     }
 
     @Bean
     public DirectExchange searchExchange() {
-        return new DirectExchange(SEARCH_EXCHANGE);
+        return new DirectExchange(SEARCH_USER_EXCHANGE);
     }
 
     @Bean
     public Binding searchBinding() {
         return BindingBuilder
-                .bind(searchQueue())
+                .bind(searchUserQueue())
                 .to(searchExchange())
-                .with(SEARCH_ROUTING_KEY);
+                .with(SEARCH_USER_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue searchProjectQueue() {
+        return new Queue(SEARCH_PROJECT_QUEUE, true);
+    }
+
+    @Bean
+    public DirectExchange searchProjectExchange() {
+        return new DirectExchange(SEARCH_PROJECT_EXCHANGE);
+    }
+
+    @Bean
+    public Binding searchProjectBinding() {
+        return BindingBuilder
+                .bind(searchProjectQueue())
+                .to(searchProjectExchange())
+                .with(SEARCH_PROJECT_ROUTING_KEY);
     }
 
 }

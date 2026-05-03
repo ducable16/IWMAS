@@ -2,8 +2,10 @@ package com.iwas.search.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.project.service.ProjectService;
 import com.iwas.search.config.SearchProperties;
 import com.iwas.search.dto.AutocompleteResponse;
+import com.iwas.search.dto.ProjectSearchResult;
 import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
@@ -21,13 +23,19 @@ import java.util.List;
 public class SearchService {
 
     private static final String ENTITY_USER = "user";
+    private static final String ENTITY_PROJECT = "project";
 
     private final RedisService cache;
     private final ElasticsearchService engine;
     private final SearchFallbackService fallback;
     private final SearchProperties properties;
+    private final ProjectService projectService;
 
-    public AutocompleteResponse autocomplete(String query) {
+    // -------------------------------------------------------------------------
+    // User
+    // -------------------------------------------------------------------------
+
+    public AutocompleteResponse autocomplete(String query, Long projectId) {
         long start = System.currentTimeMillis();
         String prefix = normalize(query);
         int minLen = properties.getAutocomplete().getMinPrefixLength();
@@ -37,7 +45,17 @@ public class SearchService {
         }
         int topN = properties.getAutocomplete().getMaxSuggestions();
 
-        // 1. Redis
+        if (projectId != null) {
+            List<SuggestionItem> suggestions = projectService
+                    .searchProjectMembers(projectId, query, topN)
+                    .stream()
+                    .map(u -> SuggestionItem.builder().term(u.getFullName()).entityId(u.getId()).build())
+                    .toList();
+            return AutocompleteResponse.builder()
+                    .prefix(prefix).suggestions(suggestions).source("database")
+                    .tookMs(System.currentTimeMillis() - start).build();
+        }
+
         List<SuggestionItem> cached = cache.getSuggestions(ENTITY_USER, prefix);
         if (!cached.isEmpty()) {
             return AutocompleteResponse.builder()
@@ -45,7 +63,6 @@ public class SearchService {
                     .tookMs(System.currentTimeMillis() - start).build();
         }
 
-        // 2. Elasticsearch
         List<SuggestionItem> suggestions = List.of();
         String source = "elasticsearch";
         try {
@@ -54,14 +71,12 @@ public class SearchService {
             log.warn("Elasticsearch autocomplete failed, falling back to DB: {}", e.getMessage());
         }
 
-        // 3. Database fallback
         if (suggestions.isEmpty()) {
             suggestions = fallback.autocompleteUsers(prefix, topN);
             source = "database";
         }
 
-        // Backfill Redis (fire-and-forget)
-        warmCacheAsync(prefix, suggestions);
+        warmCacheAsync(ENTITY_USER, prefix, suggestions);
 
         return AutocompleteResponse.builder()
                 .prefix(prefix).suggestions(suggestions).source(source)
@@ -80,12 +95,69 @@ public class SearchService {
         return fallback.searchUsers(request);
     }
 
-    @Async
-    public void warmCacheAsync(String prefix, List<SuggestionItem> items) {
+    // -------------------------------------------------------------------------
+    // Project
+    // -------------------------------------------------------------------------
+
+    public AutocompleteResponse autocompleteProjects(String query) {
+        long start = System.currentTimeMillis();
+        String prefix = normalize(query);
+        int minLen = properties.getAutocomplete().getMinPrefixLength();
+        if (prefix.length() < minLen) {
+            throw new AppException(ErrorCode.SEARCH_QUERY_TOO_SHORT,
+                    "Query must be at least " + minLen + " characters");
+        }
+        int topN = properties.getAutocomplete().getMaxSuggestions();
+
+        List<SuggestionItem> cached = cache.getSuggestions(ENTITY_PROJECT, prefix);
+        if (!cached.isEmpty()) {
+            return AutocompleteResponse.builder()
+                    .prefix(prefix).suggestions(cached).source("redis")
+                    .tookMs(System.currentTimeMillis() - start).build();
+        }
+
+        List<SuggestionItem> suggestions = List.of();
+        String source = "elasticsearch";
         try {
-            cache.putSuggestions(ENTITY_USER, prefix, items);
+            suggestions = engine.autocompleteProjects(prefix, topN);
         } catch (Exception e) {
-            log.warn("Cache warm-up failed for prefix={}: {}", prefix, e.getMessage());
+            log.warn("Elasticsearch project autocomplete failed, falling back to DB: {}", e.getMessage());
+        }
+
+        if (suggestions.isEmpty()) {
+            suggestions = fallback.autocompleteProjects(prefix, topN);
+            source = "database";
+        }
+
+        warmCacheAsync(ENTITY_PROJECT, prefix, suggestions);
+
+        return AutocompleteResponse.builder()
+                .prefix(prefix).suggestions(suggestions).source(source)
+                .tookMs(System.currentTimeMillis() - start).build();
+    }
+
+    public SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request) {
+        try {
+            SearchResponse<ProjectSearchResult> result = engine.searchProjects(request);
+            if (result.getItems() != null && !result.getItems().isEmpty()) {
+                return result;
+            }
+        } catch (Exception e) {
+            log.warn("Elasticsearch project search failed, falling back to DB: {}", e.getMessage());
+        }
+        return fallback.searchProjects(request);
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared
+    // -------------------------------------------------------------------------
+
+    @Async
+    public void warmCacheAsync(String entity, String prefix, List<SuggestionItem> items) {
+        try {
+            cache.putSuggestions(entity, prefix, items);
+        } catch (Exception e) {
+            log.warn("Cache warm-up failed for entity={} prefix={}: {}", entity, prefix, e.getMessage());
         }
     }
 

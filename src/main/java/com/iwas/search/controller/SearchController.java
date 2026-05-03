@@ -1,6 +1,7 @@
 package com.iwas.search.controller;
 
 import com.iwas.search.dto.AutocompleteResponse;
+import com.iwas.search.dto.ProjectSearchResult;
 import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.UserSearchResult;
@@ -22,9 +23,15 @@ public class SearchController {
 
     private final SearchService searchService;
 
+    // -------------------------------------------------------------------------
+    // User
+    // -------------------------------------------------------------------------
+
     @GetMapping("/autocomplete")
-    public AutocompleteResponse autocomplete(@RequestParam("q") @NotBlank String q) {
-        return searchService.autocomplete(q);
+    public AutocompleteResponse autocomplete(
+            @RequestParam("q") @NotBlank String q,
+            @RequestParam(value = "projectId", required = false) Long projectId) {
+        return searchService.autocomplete(q, projectId);
     }
 
     @GetMapping("/search")
@@ -37,5 +44,26 @@ public class SearchController {
         SearchRequest req = SearchRequest.builder()
                 .query(q).page(page).size(size).sortBy(sortBy).sortDir(sortDir).build();
         return searchService.search(req);
+    }
+
+    // -------------------------------------------------------------------------
+    // Project
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/autocomplete/projects")
+    public AutocompleteResponse autocompleteProjects(@RequestParam("q") @NotBlank String q) {
+        return searchService.autocompleteProjects(q);
+    }
+
+    @GetMapping("/search/projects")
+    public SearchResponse<ProjectSearchResult> searchProjects(
+            @RequestParam("q") @NotBlank String q,
+            @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(value = "size", defaultValue = "20") @Min(1) int size,
+            @RequestParam(value = "sortBy", required = false) String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = "desc") String sortDir) {
+        SearchRequest req = SearchRequest.builder()
+                .query(q).page(page).size(size).sortBy(sortBy).sortDir(sortDir).build();
+        return searchService.searchProjects(req);
     }
 }

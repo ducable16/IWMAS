@@ -2,6 +2,8 @@ package com.iwas.project.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.common.mesaging.event.ProjectIndexEvent;
+import com.iwas.common.mesaging.publisher.ProjectIndexEventPublisher;
 import com.iwas.project.dto.*;
 import com.iwas.project.entity.Project;
 import com.iwas.project.entity.ProjectMember;
@@ -9,7 +11,9 @@ import com.iwas.project.repository.ProjectMemberRepository;
 import com.iwas.project.repository.ProjectRepository;
 import com.iwas.project.repository.ProjectSpecification;
 import com.iwas.security.AuthenticatedUserResolver;
+import com.iwas.user.dto.UserMeResponse;
 import com.iwas.user.entity.User;
+import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,8 +22,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -31,6 +40,7 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final ProjectIndexEventPublisher projectIndexEventPublisher;
 
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
         String role = authenticatedUserResolver.currentUserRole();
@@ -104,11 +114,12 @@ public class ProjectService {
         project.setCode(request.getCode());
         project.setDescription(request.getDescription());
         project.setStatus(request.getStatus());
-        project.setPriority(request.getPriority());
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
         project.setManagerId(request.getManagerId());
-        return toProjectResponse(projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+        projectIndexEventPublisher.publish(toUpsertEvent(saved));
+        return toProjectResponse(saved);
     }
 
     @Transactional
@@ -117,11 +128,12 @@ public class ProjectService {
         project.setName(request.getName().trim());
         project.setDescription(request.getDescription());
         project.setStatus(request.getStatus());
-        project.setPriority(request.getPriority());
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
         project.setManagerId(request.getManagerId());
-        return toProjectResponse(projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+        projectIndexEventPublisher.publish(toUpsertEvent(saved));
+        return toProjectResponse(saved);
     }
 
     @Transactional
@@ -129,6 +141,10 @@ public class ProjectService {
         Project project = findProject(id);
         project.setIsDeleted(true);
         projectRepository.save(project);
+        projectIndexEventPublisher.publish(ProjectIndexEvent.builder()
+                .op(ProjectIndexEvent.Op.DELETE)
+                .projectId(id)
+                .build());
     }
 
     public List<ProjectMemberResponse> getProjectMembers(Long projectId) {
@@ -187,6 +203,41 @@ public class ProjectService {
         projectMemberRepository.save(member);
     }
 
+    // --- Search index helpers ---
+
+    private ProjectIndexEvent toUpsertEvent(Project p) {
+        return ProjectIndexEvent.builder()
+                .op(ProjectIndexEvent.Op.UPSERT)
+                .projectId(p.getId())
+                .name(p.getName())
+                .code(p.getCode())
+                .status(p.getStatus() == null ? null : p.getStatus().name())
+                .managerId(p.getManagerId())
+                .build();
+    }
+
+    // --- Member search ---
+
+    public List<UserMeResponse> searchProjectMembers(Long projectId, String q, int size) {
+        Project project = findProject(projectId);
+        requireProjectAccess(projectId);
+
+        Set<Long> participantIds = new HashSet<>();
+        participantIds.add(project.getManagerId());
+        projectMemberRepository.findByProjectId(projectId)
+                .stream().map(ProjectMember::getUserId)
+                .forEach(participantIds::add);
+
+        if (participantIds.isEmpty()) return List.of();
+
+        String keyword = "%" + (q == null ? "" : q.trim().toLowerCase()) + "%";
+        int limit = Math.min(size, 20);
+        List<User> users = userRepository.searchByIdsAndKeyword(
+                new ArrayList<>(participantIds), keyword, PageRequest.of(0, limit));
+
+        return users.stream().map(UserMapper::toUserMeResponse).toList();
+    }
+
     // --- Access control helpers ---
 
     public boolean isManagerOf(Long projectId, Long userId) {
@@ -198,6 +249,10 @@ public class ProjectService {
 
     public boolean isMemberOf(Long projectId, Long userId) {
         return projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, userId).isPresent();
+    }
+
+    public boolean isProjectParticipant(Long projectId, Long userId) {
+        return isManagerOf(projectId, userId) || isMemberOf(projectId, userId);
     }
 
     public void requireProjectAccess(Long projectId) {
@@ -242,7 +297,6 @@ public class ProjectService {
                 .code(p.getCode())
                 .description(p.getDescription())
                 .status(p.getStatus())
-                .priority(p.getPriority())
                 .startDate(p.getStartDate())
                 .endDate(p.getEndDate())
                 .actualEndDate(p.getActualEndDate())

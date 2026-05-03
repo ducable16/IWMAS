@@ -139,6 +139,7 @@ public class TaskService {
     @Transactional
     @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse createTask(TaskRequest request, Long reporterId) {
+        validateAssignee(request.getProjectId(), request.getAssigneeId());
         Task task = new Task();
         applyRequest(task, request);
         task.setReporterId(reporterId);
@@ -156,6 +157,7 @@ public class TaskService {
     public TaskResponse updateTask(Long id, TaskRequest request) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
+        validateAssignee(request.getProjectId(), request.getAssigneeId());
         applyRequest(task, request);
         task = taskRepository.save(task);
 
@@ -254,6 +256,15 @@ public class TaskService {
                             .build();
                 })
                 .toList();
+    }
+
+    // --- Validation helpers ---
+
+    private void validateAssignee(Long projectId, Long assigneeId) {
+        if (assigneeId == null) return;
+        if (!projectService.isProjectParticipant(projectId, assigneeId)) {
+            throw new AppException(ErrorCode.TASK_ASSIGNEE_NOT_PROJECT_MEMBER);
+        }
     }
 
     // --- Access control helpers ---

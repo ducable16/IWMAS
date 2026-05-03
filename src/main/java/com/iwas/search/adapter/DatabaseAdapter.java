@@ -1,6 +1,9 @@
 package com.iwas.search.adapter;
 
+import com.iwas.project.entity.Project;
+import com.iwas.project.repository.ProjectRepository;
 import com.iwas.search.config.SearchProperties;
+import com.iwas.search.dto.ProjectSearchResult;
 import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
@@ -25,7 +28,12 @@ import java.util.stream.Collectors;
 public class DatabaseAdapter implements SearchFallbackService {
 
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
     private final SearchProperties properties;
+
+    // -------------------------------------------------------------------------
+    // User
+    // -------------------------------------------------------------------------
 
     @Override
     public SearchResponse<UserSearchResult> searchUsers(SearchRequest request) {
@@ -46,7 +54,7 @@ public class DatabaseAdapter implements SearchFallbackService {
         Page<User> page = userRepository.findAll(spec, pageable);
 
         List<UserSearchResult> items = page.getContent().stream()
-                .map(this::toResult)
+                .map(this::toUserResult)
                 .collect(Collectors.toList());
 
         return SearchResponse.<UserSearchResult>builder()
@@ -74,7 +82,61 @@ public class DatabaseAdapter implements SearchFallbackService {
                 .collect(Collectors.toList());
     }
 
-    private UserSearchResult toResult(User u) {
+    // -------------------------------------------------------------------------
+    // Project
+    // -------------------------------------------------------------------------
+
+    @Override
+    public SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request) {
+        long start = System.currentTimeMillis();
+        int size = Math.min(request.getSize(), properties.getElasticsearch().getMaxPageSize());
+        String like = "%" + request.getQuery().toLowerCase() + "%";
+
+        Specification<Project> spec = (root, q, cb) -> cb.and(
+                cb.equal(root.get("isDeleted"), false),
+                cb.or(
+                        cb.like(cb.lower(root.get("name")), like),
+                        cb.like(cb.lower(root.get("code")), like)));
+
+        PageRequest pageable = PageRequest.of(request.getPage(), size,
+                Sort.by(Sort.Direction.ASC, "name"));
+
+        Page<Project> page = projectRepository.findAll(spec, pageable);
+
+        List<ProjectSearchResult> items = page.getContent().stream()
+                .map(this::toProjectResult)
+                .collect(Collectors.toList());
+
+        return SearchResponse.<ProjectSearchResult>builder()
+                .items(items)
+                .total(page.getTotalElements())
+                .page(request.getPage())
+                .size(size)
+                .source("database")
+                .tookMs(System.currentTimeMillis() - start)
+                .build();
+    }
+
+    @Override
+    public List<SuggestionItem> autocompleteProjects(String prefix, int topN) {
+        SearchRequest req = SearchRequest.builder()
+                .query(prefix)
+                .page(0)
+                .size(topN)
+                .build();
+        return searchProjects(req).getItems().stream()
+                .map(p -> SuggestionItem.builder()
+                        .term(p.getName())
+                        .entityId(p.getId())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private UserSearchResult toUserResult(User u) {
         return UserSearchResult.builder()
                 .id(u.getId())
                 .email(u.getEmail())
@@ -82,6 +144,16 @@ public class DatabaseAdapter implements SearchFallbackService {
                 .position(u.getPosition())
                 .avatarUrl(u.getAvatarUrl())
                 .role(u.getRole() == null ? null : u.getRole().name())
+                .build();
+    }
+
+    private ProjectSearchResult toProjectResult(Project p) {
+        return ProjectSearchResult.builder()
+                .id(p.getId())
+                .name(p.getName())
+                .code(p.getCode())
+                .status(p.getStatus() == null ? null : p.getStatus().name())
+                .managerId(p.getManagerId())
                 .build();
     }
 }

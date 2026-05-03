@@ -15,7 +15,7 @@ public class UserIndexEventListener {
 
     private final ElasticsearchService engine;
 
-    @RabbitListener(queues = "${app.rabbitmq.search-sync-queue}",
+    @RabbitListener(queues = "${app.rabbitmq.search-user-sync-queue}",
                     containerFactory = "rabbitListenerContainerFactory")
     public void onMessage(UserIndexEvent event) {
         try {

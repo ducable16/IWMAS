@@ -22,6 +22,7 @@ public class SearchProperties {
     @Data
     public static class Elasticsearch {
         private String userIndex = "iwas-users";
+        private String projectIndex = "iwas-projects";
         private int maxPageSize = 50;
     }
 }

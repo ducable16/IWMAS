@@ -1,6 +1,5 @@
 package com.iwas.project.dto;
 
-import com.iwas.project.enums.ProjectPriority;
 import com.iwas.project.enums.ProjectStatus;
 import lombok.Data;
 
@@ -13,8 +12,6 @@ public class ProjectFilterRequest {
     private String search;
 
     private List<ProjectStatus> statuses;
-
-    private List<ProjectPriority> priorities;
 
     private Long managerId;
 

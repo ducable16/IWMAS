@@ -3,6 +3,7 @@ package com.iwas.project.controller;
 import com.iwas.project.dto.*;
 import com.iwas.project.service.ProjectService;
 import com.iwas.security.AuthenticatedUserResolver;
+import com.iwas.user.dto.UserMeResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -59,6 +60,14 @@ public class ProjectController {
     @GetMapping("/{id}/members")
     public List<ProjectMemberResponse> getMembers(@PathVariable Long id) {
         return projectService.getProjectMembers(id);
+    }
+
+    @GetMapping("/{id}/members/search")
+    public List<UserMeResponse> searchMembers(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "10") int size) {
+        return projectService.searchProjectMembers(id, q, size);
     }
 
     @PostMapping("/{id}/members")

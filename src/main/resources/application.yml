@@ -56,8 +56,10 @@ app:
     from: toilaatmin@gmail.com
   rabbitmq:
     email-queue: email.verification
-    search-sync-queue: iwas.search.sync
-    search-sync-exchange: iwas.search.sync.exchange
+    search-user-sync-queue: search.user.sync
+    search-user-sync-exchange: search.sync.user.exchange
+    search-project-sync-queue: search.project.sync
+    search-project-sync-exchange: search.project.sync.exchange
   search:
     autocomplete:
       max-suggestions: 10
@@ -65,6 +67,7 @@ app:
       min-prefix-length: 2
     elasticsearch:
       user-index: iwas-users
+      project-index: iwas-projects
       max-page-size: 50
   frontend:
     base-url: http://localhost:5173
