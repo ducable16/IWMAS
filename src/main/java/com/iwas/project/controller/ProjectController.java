@@ -6,10 +6,12 @@ import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.user.dto.UserMeResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -92,5 +94,15 @@ public class ProjectController {
     public void removeMember(@PathVariable Long id,
                              @PathVariable Long memberId) {
         projectService.removeMember(id, memberId);
+    }
+
+    @GetMapping("/users/{userId}/effort-remaining")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    public UserEffortRemainingResponse getUserEffortRemaining(
+            @PathVariable Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(defaultValue = "false") boolean detail) {
+        return projectService.getUserEffortRemaining(userId, startDate, endDate, detail);
     }
 }

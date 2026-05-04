@@ -7,6 +7,7 @@ import com.iwas.common.mesaging.publisher.ProjectIndexEventPublisher;
 import com.iwas.project.dto.*;
 import com.iwas.project.entity.Project;
 import com.iwas.project.entity.ProjectMember;
+import com.iwas.project.enums.ProjectStatus;
 import com.iwas.project.repository.ProjectMemberRepository;
 import com.iwas.project.repository.ProjectRepository;
 import com.iwas.project.repository.ProjectSpecification;
@@ -24,11 +25,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.data.domain.PageRequest;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -307,6 +311,179 @@ public class ProjectService {
         }
         return memberIds;
     }
+
+    // --- Effort remaining ---
+
+    public UserEffortRemainingResponse getUserEffortRemaining(Long userId, LocalDate startDate,
+                                                               LocalDate endDate, boolean detail) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        List<ProjectMember> activeMemberships = projectMemberRepository.findActiveProjectsByUserId(userId);
+        if (activeMemberships.isEmpty()) {
+            return emptyEffortResponse(userId, user.getFullName(), startDate, endDate, detail);
+        }
+
+        Map<Long, Project> projectMap = projectRepository
+                .findAllById(activeMemberships.stream().map(ProjectMember::getProjectId).toList())
+                .stream().collect(Collectors.toMap(Project::getId, p -> p));
+
+        List<ProjectMember> relevant = activeMemberships.stream()
+                .filter(pm -> {
+                    Project p = projectMap.get(pm.getProjectId());
+                    if (p == null) return false;
+                    if (p.getStatus() == ProjectStatus.COMPLETED || p.getStatus() == ProjectStatus.CANCELLED) return false;
+                    if (startDate == null && endDate == null) return true;
+                    return periodsOverlap(p.getStartDate(), p.getEndDate(), startDate, endDate);
+                })
+                .toList();
+
+        List<AllocationInterval> intervals = relevant.stream()
+                .filter(pm -> pm.getAllocatedEffortPercent() != null && pm.getAllocatedEffortPercent() > 0)
+                .map(pm -> {
+                    Project p = projectMap.get(pm.getProjectId());
+                    LocalDate s = p.getStartDate() != null ? p.getStartDate() : LocalDate.of(2000, 1, 1);
+                    LocalDate e = p.getEndDate()   != null ? p.getEndDate()   : LocalDate.of(9999, 12, 31);
+                    return new AllocationInterval(s, e, pm.getAllocatedEffortPercent(),
+                            p.getId(), p.getName(), p.getCode());
+                })
+                .toList();
+
+        SweepResult sweep = buildSweepResult(intervals, detail);
+
+        List<UserEffortRemainingResponse.AllocationEntry> entries = relevant.stream()
+                .map(pm -> {
+                    Project p = projectMap.get(pm.getProjectId());
+                    return UserEffortRemainingResponse.AllocationEntry.builder()
+                            .projectId(p.getId())
+                            .projectName(p.getName())
+                            .projectCode(p.getCode())
+                            .allocatedPercent(pm.getAllocatedEffortPercent() != null ? pm.getAllocatedEffortPercent() : 0)
+                            .projectStartDate(p.getStartDate())
+                            .projectEndDate(p.getEndDate())
+                            .build();
+                })
+                .toList();
+
+        return UserEffortRemainingResponse.builder()
+                .userId(userId)
+                .userName(user.getFullName())
+                .queryStart(startDate)
+                .queryEnd(endDate)
+                .peakAllocatedPercent(sweep.peak())
+                .remainingPercent(Math.max(0, 100 - sweep.peak()))
+                .overlappingAllocations(entries)
+                .futureAvailabilityNotes(sweep.futureNotes())
+                .allocationTimeline(sweep.timeline())
+                .build();
+    }
+
+    private UserEffortRemainingResponse emptyEffortResponse(Long userId, String userName,
+                                                             LocalDate startDate, LocalDate endDate,
+                                                             boolean detail) {
+        return UserEffortRemainingResponse.builder()
+                .userId(userId).userName(userName)
+                .queryStart(startDate).queryEnd(endDate)
+                .peakAllocatedPercent(0).remainingPercent(100)
+                .overlappingAllocations(List.of())
+                .futureAvailabilityNotes(List.of())
+                .allocationTimeline(detail ? List.of() : null)
+                .build();
+    }
+
+    /**
+     * Two date ranges overlap when neither ends strictly before the other starts.
+     * Null means open-ended (no bound in that direction).
+     */
+    private boolean periodsOverlap(LocalDate s1, LocalDate e1, LocalDate s2, LocalDate e2) {
+        boolean s1AfterE2 = s1 != null && e2 != null && s1.isAfter(e2);
+        boolean s2AfterE1 = s2 != null && e1 != null && s2.isAfter(e1);
+        return !s1AfterE2 && !s2AfterE1;
+    }
+
+    /**
+     * Sweep-line over allocation intervals.
+     * Always builds futureAvailabilityNotes (lightweight).
+     * Builds allocationTimeline only when detail=true.
+     */
+    private SweepResult buildSweepResult(List<AllocationInterval> intervals, boolean detail) {
+        if (intervals.isEmpty()) {
+            return new SweepResult(0, List.of(), detail ? List.of() : null);
+        }
+
+        LocalDate today = LocalDate.now();
+        TreeMap<LocalDate, Integer> eventDeltas = new TreeMap<>();
+        Map<LocalDate, List<AllocationInterval>> startsByDate = new HashMap<>();
+        Map<LocalDate, List<AllocationInterval>> endsByDate = new HashMap<>();
+
+        for (AllocationInterval i : intervals) {
+            eventDeltas.merge(i.start(), i.percent(), Integer::sum);
+            eventDeltas.merge(i.end().plusDays(1), -i.percent(), Integer::sum);
+            startsByDate.computeIfAbsent(i.start(), k -> new ArrayList<>()).add(i);
+            endsByDate.computeIfAbsent(i.end().plusDays(1), k -> new ArrayList<>()).add(i);
+        }
+
+        int peak = 0, running = 0;
+        List<UserEffortRemainingResponse.FutureAvailabilityNote> futureNotes = new ArrayList<>();
+        List<UserEffortRemainingResponse.TimelineSegment> timeline = detail ? new ArrayList<>() : null;
+        List<LocalDate> sortedDates = new ArrayList<>(eventDeltas.keySet());
+
+        for (int idx = 0; idx < sortedDates.size(); idx++) {
+            LocalDate date = sortedDates.get(idx);
+            int delta = eventDeltas.get(date);
+            running += delta;
+            peak = Math.max(peak, running);
+
+            // Note: capacity freed in the future
+            if (delta < 0 && date.isAfter(today)) {
+                List<AllocationInterval> ending = endsByDate.getOrDefault(date, List.of());
+                futureNotes.add(UserEffortRemainingResponse.FutureAvailabilityNote.builder()
+                        .availableFrom(date)
+                        .additionalFreePercent(-delta)
+                        .cumulativeRemainingPercent(Math.max(0, 100 - running))
+                        .triggeringProjects(ending.stream().map(this::toProjectRef).toList())
+                        .build());
+            }
+
+            // Timeline segment: from this event date to the day before the next
+            if (detail) {
+                LocalDate segEnd = idx + 1 < sortedDates.size()
+                        ? sortedDates.get(idx + 1).minusDays(1)
+                        : null;
+                List<AllocationInterval> starting = startsByDate.getOrDefault(date, List.of());
+                List<AllocationInterval> ending = endsByDate.getOrDefault(date, List.of());
+                timeline.add(UserEffortRemainingResponse.TimelineSegment.builder()
+                        .from(date)
+                        .to(segEnd)
+                        .allocatedPercent(running)
+                        .remainingPercent(Math.max(0, 100 - running))
+                        .changeSummary(UserEffortRemainingResponse.ChangeSummary.builder()
+                                .deltaPercent(delta)
+                                .startingProjects(starting.isEmpty() ? null : starting.stream().map(this::toProjectRef).toList())
+                                .endingProjects(ending.isEmpty() ? null : ending.stream().map(this::toProjectRef).toList())
+                                .build())
+                        .build());
+            }
+        }
+
+        return new SweepResult(peak, futureNotes, timeline);
+    }
+
+    private UserEffortRemainingResponse.ProjectRef toProjectRef(AllocationInterval ai) {
+        return UserEffortRemainingResponse.ProjectRef.builder()
+                .projectId(ai.projectId())
+                .projectName(ai.projectName())
+                .projectCode(ai.projectCode())
+                .allocatedPercent(ai.percent())
+                .build();
+    }
+
+    private record AllocationInterval(LocalDate start, LocalDate end, int percent,
+                                       Long projectId, String projectName, String projectCode) {}
+
+    private record SweepResult(int peak,
+                                List<UserEffortRemainingResponse.FutureAvailabilityNote> futureNotes,
+                                List<UserEffortRemainingResponse.TimelineSegment> timeline) {}
 
     // --- Private helpers ---
 
