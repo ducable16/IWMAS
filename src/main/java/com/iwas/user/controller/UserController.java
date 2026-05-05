@@ -2,7 +2,13 @@ package com.iwas.user.controller;
 
 import com.iwas.auth.dto.ChangePasswordRequest;
 import com.iwas.auth.dto.UpdateProfileRequest;
+import com.iwas.project.dto.ProjectFilterRequest;
+import com.iwas.project.dto.ProjectPageResponse;
+import com.iwas.project.service.ProjectService;
 import com.iwas.security.AuthenticatedUserResolver;
+import com.iwas.task.dto.TaskFilterRequest;
+import com.iwas.task.dto.TaskPageResponse;
+import com.iwas.task.service.TaskService;
 import com.iwas.user.dto.CreateUserRequest;
 import com.iwas.user.dto.UpdateUserRequest;
 import com.iwas.user.dto.UserFilterRequest;
@@ -22,6 +28,8 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final ProjectService projectService;
+    private final TaskService taskService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping("/me")
@@ -75,5 +83,26 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public UserMeResponse deactivateUser(@PathVariable Long id) {
         return userService.toggleUserActive(id, false);
+    }
+
+    @GetMapping("/{userId}/projects")
+    public ProjectPageResponse getUserProjects(
+            @PathVariable Long userId,
+            @ModelAttribute ProjectFilterRequest filter) {
+        return projectService.getUserProjects(userId, filter);
+    }
+
+    @GetMapping("/{userId}/tasks/assigned")
+    public TaskPageResponse getUserAssignedTasks(
+            @PathVariable Long userId,
+            @ModelAttribute TaskFilterRequest filter) {
+        return taskService.getTasksAssignedToUser(userId, filter);
+    }
+
+    @GetMapping("/{userId}/tasks/reported")
+    public TaskPageResponse getUserReportedTasks(
+            @PathVariable Long userId,
+            @ModelAttribute TaskFilterRequest filter) {
+        return taskService.getTasksReportedByUser(userId, filter);
     }
 }

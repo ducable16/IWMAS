@@ -68,6 +68,46 @@ public class TaskService {
         return toResponseList(tasks);
     }
 
+    public TaskPageResponse getTasksAssignedToUser(Long targetUserId, TaskFilterRequest filter) {
+        userRepository.findById(targetUserId)
+                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        filter.setAssigneeId(targetUserId);
+        return searchTasksForUser(filter);
+    }
+
+    public TaskPageResponse getTasksReportedByUser(Long targetUserId, TaskFilterRequest filter) {
+        userRepository.findById(targetUserId)
+                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        filter.setReporterId(targetUserId);
+        return searchTasksForUser(filter);
+    }
+
+    private TaskPageResponse searchTasksForUser(TaskFilterRequest filter) {
+        int size = Math.min(filter.getSize(), 100);
+        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
+        PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
+
+        Specification<Task> spec = TaskSpecification.fromFilter(filter);
+        Specification<Task> filtered = applyAccessFilter(spec);
+        if (filtered == null) {
+            return TaskPageResponse.builder()
+                    .content(List.of()).page(filter.getPage()).size(size)
+                    .totalElements(0).totalPages(0).build();
+        }
+
+        Page<Task> page = taskRepository.findAll(filtered, pageRequest);
+        List<TaskResponse> content = toResponseList(page.getContent());
+        return TaskPageResponse.builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
+    }
+
     public TaskResponse getTaskById(Long id) {
         Task task = findTask(id);
         projectService.requireProjectAccess(task.getProjectId());

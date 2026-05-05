@@ -100,6 +100,59 @@ public class ProjectService {
                 .build();
     }
 
+    public ProjectPageResponse getUserProjects(Long targetUserId, ProjectFilterRequest filter) {
+        userRepository.findById(targetUserId)
+                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        Set<Long> targetProjectIds = new HashSet<>();
+        projectRepository.findByManagerId(targetUserId)
+                .stream().map(Project::getId).forEach(targetProjectIds::add);
+        projectMemberRepository.findActiveProjectsByUserId(targetUserId)
+                .stream().map(ProjectMember::getProjectId).forEach(targetProjectIds::add);
+
+        if (targetProjectIds.isEmpty()) {
+            return ProjectPageResponse.builder()
+                    .content(List.of()).page(filter.getPage()).size(filter.getSize())
+                    .totalElements(0).totalPages(0).build();
+        }
+
+        List<Long> callerAccessibleIds = getAccessibleProjectIds();
+        Set<Long> visibleIds;
+        if (callerAccessibleIds == null) {
+            visibleIds = targetProjectIds;
+        } else {
+            visibleIds = targetProjectIds.stream()
+                    .filter(callerAccessibleIds::contains)
+                    .collect(Collectors.toSet());
+        }
+
+        if (visibleIds.isEmpty()) {
+            return ProjectPageResponse.builder()
+                    .content(List.of()).page(filter.getPage()).size(filter.getSize())
+                    .totalElements(0).totalPages(0).build();
+        }
+
+        int size = Math.min(filter.getSize(), 100);
+        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
+        PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
+
+        var spec = ProjectSpecification.fromFilter(filter)
+                .and((root, query, cb) -> root.get("id").in(visibleIds));
+        Page<Project> page = projectRepository.findAll(spec, pageRequest);
+
+        List<ProjectResponse> content = page.getContent().stream()
+                .map(this::toProjectResponse)
+                .toList();
+        return ProjectPageResponse.builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
+    }
+
     public ProjectResponse getProjectById(Long id) {
         Project project = findProject(id);
         requireProjectAccess(id);
