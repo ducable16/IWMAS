@@ -2,6 +2,7 @@ package com.iwas.workload.controller;
 
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.workload.dto.BurnoutLogResponse;
+import com.iwas.workload.dto.MemberWorkloadResponse;
 import com.iwas.workload.dto.WorkloadSnapshotResponse;
 import com.iwas.workload.service.WorkloadService;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,32 @@ public class WorkloadController {
     @ResponseStatus(HttpStatus.CREATED)
     public WorkloadSnapshotResponse takeSnapshot(@RequestParam Long userId) {
         return workloadService.takeSnapshot(userId);
+    }
+
+    @GetMapping("/projects/{projectId}/members")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    public List<MemberWorkloadResponse> getProjectMembersWorkload(
+            @PathVariable Long projectId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd) {
+        return workloadService.getProjectMembersWorkload(projectId, weekStart, weekEnd);
+    }
+
+    @GetMapping("/users/{userId}/realtime")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
+    public MemberWorkloadResponse getUserWorkloadRealtime(
+            @PathVariable Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd) {
+        return workloadService.getUserWorkloadRealtime(userId, weekStart, weekEnd);
+    }
+
+    @GetMapping("/me/realtime")
+    public MemberWorkloadResponse getMyWorkloadRealtime(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd) {
+        return workloadService.getUserWorkloadRealtime(
+                authenticatedUserResolver.currentUserId(), weekStart, weekEnd);
     }
 
     @GetMapping("/burnout")

@@ -1,5 +1,6 @@
 package com.iwas.workload.dto;
 
+import com.iwas.workload.enums.WorkloadLevel;
 import lombok.Builder;
 import lombok.Data;
 
@@ -18,4 +19,9 @@ public class WorkloadSnapshotResponse {
     private BigDecimal capacityUsedPercent;
     private Integer projectCount;
     private Integer activeTaskCount;
+    private BigDecimal weeklyCapacityHours;
+    private BigDecimal weeklyRemainingHours;
+    private BigDecimal utilizationPercent;
+    private WorkloadLevel workloadLevel;
+    private Integer overdueTaskCount;
 }

@@ -30,6 +30,17 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
     @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.dueDate BETWEEN :from AND :to AND t.status NOT IN ('DONE', 'CANCELLED')")
     List<Task> findTasksDueBetween(LocalDate from, LocalDate to);
 
+    @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.assigneeId = :assigneeId " +
+           "AND t.dueDate BETWEEN :from AND :to AND t.status NOT IN ('DONE', 'CANCELLED')")
+    List<Task> findActiveTasksDueBetweenByAssignee(@Param("assigneeId") Long assigneeId,
+                                                   @Param("from") LocalDate from,
+                                                   @Param("to") LocalDate to);
+
+    @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.assigneeId = :assigneeId " +
+           "AND t.dueDate < :today AND t.status NOT IN ('DONE', 'CANCELLED')")
+    List<Task> findOverdueTasksByAssignee(@Param("assigneeId") Long assigneeId,
+                                         @Param("today") LocalDate today);
+
     @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.dueDate < :today " +
            "AND t.status NOT IN ('DONE', 'CANCELLED') AND t.assigneeId IS NOT NULL " +
            "AND (t.lastOverdueNotifiedAt IS NULL OR t.lastOverdueNotifiedAt < :today)")

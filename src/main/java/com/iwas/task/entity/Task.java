@@ -50,7 +50,7 @@ public class Task extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private TaskStatus status = TaskStatus.TODO;
+    private TaskStatus status = TaskStatus.OPEN;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "priority", nullable = false, length = 20)

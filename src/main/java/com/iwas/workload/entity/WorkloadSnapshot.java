@@ -1,5 +1,6 @@
 package com.iwas.workload.entity;
 
+import com.iwas.workload.enums.WorkloadLevel;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -50,6 +51,22 @@ public class WorkloadSnapshot {
 
     @Column(name = "active_task_count")
     private Integer activeTaskCount = 0;
+
+    @Column(name = "weekly_capacity_hours", precision = 6, scale = 1)
+    private BigDecimal weeklyCapacityHours;
+
+    @Column(name = "weekly_remaining_hours", precision = 6, scale = 1)
+    private BigDecimal weeklyRemainingHours;
+
+    @Column(name = "utilization_percent", precision = 5, scale = 2)
+    private BigDecimal utilizationPercent;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "workload_level", length = 20)
+    private WorkloadLevel workloadLevel;
+
+    @Column(name = "overdue_task_count")
+    private Integer overdueTaskCount = 0;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
