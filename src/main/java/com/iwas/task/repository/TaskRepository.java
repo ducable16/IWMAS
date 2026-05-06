@@ -5,6 +5,7 @@ import com.iwas.task.enums.TaskStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -28,4 +29,13 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
 
     @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.dueDate BETWEEN :from AND :to AND t.status NOT IN ('DONE', 'CANCELLED')")
     List<Task> findTasksDueBetween(LocalDate from, LocalDate to);
+
+    @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.dueDate < :today " +
+           "AND t.status NOT IN ('DONE', 'CANCELLED') AND t.assigneeId IS NOT NULL " +
+           "AND (t.lastOverdueNotifiedAt IS NULL OR t.lastOverdueNotifiedAt < :today)")
+    List<Task> findOverdueTasksNotNotifiedToday(@Param("today") LocalDate today);
+
+    @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.dueDate IN :dates " +
+           "AND t.status NOT IN ('DONE', 'CANCELLED') AND t.assigneeId IS NOT NULL")
+    List<Task> findTasksDueOn(@Param("dates") List<LocalDate> dates);
 }

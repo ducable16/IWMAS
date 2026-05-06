@@ -31,4 +31,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.id = :userId")
     Optional<User> findByIdWithLock(@Param("userId") Long userId);
+
+    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND LOWER(:mention) LIKE CONCAT(LOWER(u.fullName), '%')")
+    List<User> findByMentionStartsWith(@Param("mention") String mention);
 }

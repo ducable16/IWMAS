@@ -4,6 +4,8 @@ import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
 import com.iwas.common.mesaging.event.ProjectIndexEvent;
 import com.iwas.common.mesaging.publisher.ProjectIndexEventPublisher;
+import com.iwas.notification.enums.NotificationType;
+import com.iwas.notification.service.NotificationService;
 import com.iwas.project.dto.*;
 import com.iwas.project.entity.Project;
 import com.iwas.project.entity.ProjectMember;
@@ -45,6 +47,7 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final ProjectIndexEventPublisher projectIndexEventPublisher;
+    private final NotificationService notificationService;
 
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
         String role = authenticatedUserResolver.currentUserRole();
@@ -219,7 +222,7 @@ public class ProjectService {
 
     @Transactional
     public ProjectMemberResponse addMember(Long projectId, ProjectMemberRequest request) {
-        findProject(projectId);
+        Project project = findProject(projectId);
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, request.getUserId())
                 .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
 
@@ -235,7 +238,15 @@ public class ProjectService {
 
         String userName = userRepository.findById(request.getUserId())
                 .map(User::getFullName).orElse(null);
-        return toMemberResponse(projectMemberRepository.save(member), userName);
+        ProjectMember saved = projectMemberRepository.save(member);
+
+        notificationService.send(
+                request.getUserId(), NotificationType.PROJECT_ADDED,
+                "Bạn được thêm vào project",
+                "Bạn đã được thêm vào project \"" + project.getName() + "\".",
+                "PROJECT", projectId);
+
+        return toMemberResponse(saved, userName);
     }
 
     @Transactional

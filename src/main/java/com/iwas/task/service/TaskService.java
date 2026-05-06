@@ -2,6 +2,8 @@ package com.iwas.task.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.notification.enums.NotificationType;
+import com.iwas.notification.service.NotificationService;
 import com.iwas.project.service.ProjectService;
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.skill.entity.Skill;
@@ -47,6 +49,7 @@ public class TaskService {
     private final SkillRepository skillRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
+    private final NotificationService notificationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @Lazy
@@ -189,6 +192,14 @@ public class TaskService {
             saveSkillRequirements(task.getId(), request.getSkillRequirements());
         }
 
+        if (task.getAssigneeId() != null) {
+            notificationService.send(
+                    task.getAssigneeId(), NotificationType.TASK_ASSIGNED,
+                    "Bạn được giao một task mới",
+                    "Task \"" + task.getTitle() + "\" đã được giao cho bạn.",
+                    "TASK", task.getId());
+        }
+
         return toResponse(task, getSkillRequirements(task.getId()));
     }
 
@@ -198,12 +209,22 @@ public class TaskService {
         Task task = findTask(id);
         requireTaskEditAccess(task);
         validateAssignee(request.getProjectId(), request.getAssigneeId());
+        Long oldAssigneeId = task.getAssigneeId();
         applyRequest(task, request);
         task = taskRepository.save(task);
 
         if (request.getSkillRequirements() != null) {
             taskSkillRequirementRepository.deleteByTaskId(id);
             saveSkillRequirements(task.getId(), request.getSkillRequirements());
+        }
+
+        Long newAssigneeId = task.getAssigneeId();
+        if (newAssigneeId != null && !newAssigneeId.equals(oldAssigneeId)) {
+            notificationService.send(
+                    newAssigneeId, NotificationType.TASK_ASSIGNED,
+                    "Bạn được giao một task",
+                    "Task \"" + task.getTitle() + "\" đã được giao cho bạn.",
+                    "TASK", task.getId());
         }
 
         return toResponse(task, getSkillRequirements(task.getId()));
@@ -237,6 +258,18 @@ public class TaskService {
             task.setCompletedAt(null);
         }
         task = taskRepository.save(task);
+
+        String statusMsg = "Task \"" + task.getTitle() + "\" chuyển sang " + request.getStatus().getDisplayName() + ".";
+        if (task.getAssigneeId() != null && !task.getAssigneeId().equals(changedById)) {
+            notificationService.send(task.getAssigneeId(), NotificationType.TASK_STATUS_CHANGED,
+                    "Trạng thái task đã thay đổi", statusMsg, "TASK", id);
+        }
+        if (task.getReporterId() != null && !task.getReporterId().equals(changedById)
+                && !task.getReporterId().equals(task.getAssigneeId())) {
+            notificationService.send(task.getReporterId(), NotificationType.TASK_STATUS_CHANGED,
+                    "Trạng thái task đã thay đổi", statusMsg, "TASK", id);
+        }
+
         return toResponse(task, getSkillRequirements(task.getId()));
     }
 

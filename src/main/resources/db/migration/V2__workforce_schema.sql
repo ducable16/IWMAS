@@ -237,7 +237,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     read_at timestamp,
     created_at timestamp NOT NULL DEFAULT now(),
     CONSTRAINT ck_notification_type CHECK (type IN (
-        'TASK_ASSIGNED','TASK_OVERDUE','TASK_STATUS_CHANGED',
+        'TASK_ASSIGNED','TASK_OVERDUE','TASK_STATUS_CHANGED','COMMENT_MENTION',
         'OVERLOAD_WARNING','BURNOUT_ALERT','PROJECT_ADDED','DEADLINE_REMINDER'
     ))
 );

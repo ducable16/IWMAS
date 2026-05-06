@@ -7,12 +7,14 @@ import com.iwas.notification.entity.Notification;
 import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -56,6 +58,8 @@ public class NotificationService {
 
     public Notification send(Long recipientId, NotificationType type, String title, String content,
                               String referenceType, Long referenceId) {
+        log.info("[Notification] type={} recipientId={} referenceType={} referenceId={} title={}",
+                type, recipientId, referenceType, referenceId, title);
         Notification notification = new Notification();
         notification.setRecipientId(recipientId);
         notification.setType(type);

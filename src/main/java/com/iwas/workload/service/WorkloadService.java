@@ -1,5 +1,7 @@
 package com.iwas.workload.service;
 
+import com.iwas.notification.enums.NotificationType;
+import com.iwas.notification.service.NotificationService;
 import com.iwas.project.repository.ProjectMemberRepository;
 import com.iwas.task.repository.TaskRepository;
 import com.iwas.user.entity.User;
@@ -29,6 +31,7 @@ public class WorkloadService {
     private final UserRepository userRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final TaskRepository taskRepository;
+    private final NotificationService notificationService;
 
     public List<WorkloadSnapshotResponse> getTeamWorkload(LocalDate date) {
         LocalDate targetDate = date != null ? date : LocalDate.now();
@@ -85,6 +88,15 @@ public class WorkloadService {
         snapshot.setActiveTaskCount(activeTaskCount);
 
         WorkloadSnapshot saved = workloadSnapshotRepository.save(snapshot);
+
+        if (capacityPercent.compareTo(java.math.BigDecimal.valueOf(90)) >= 0) {
+            notificationService.send(
+                    userId, NotificationType.OVERLOAD_WARNING,
+                    "Cảnh báo quá tải công việc",
+                    "Bạn đang sử dụng " + capacityPercent.toPlainString() + "% năng lực. Hãy kiểm tra khối lượng công việc.",
+                    "WORKLOAD", saved.getId());
+        }
+
         String name = userRepository.findById(userId).map(User::getFullName).orElse(null);
         return toSnapshotResponse(saved, name);
     }

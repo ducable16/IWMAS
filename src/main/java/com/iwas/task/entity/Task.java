@@ -80,6 +80,9 @@ public class Task extends BaseEntity {
     @Column(name = "sprint", length = 100)
     private String sprint;
 
+    @Column(name = "last_overdue_notified_at")
+    private LocalDate lastOverdueNotifiedAt;
+
     @Fetch(FetchMode.SELECT)
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
