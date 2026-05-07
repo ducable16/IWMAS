@@ -35,6 +35,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Object>> handleJsonMappingException(HttpMessageNotReadableException ex) {
+        log.warn("Invalid JSON format: {}", ex.getMessage());
         return ResponseEntity
                 .badRequest()
                 .body(ApiResponse.error(ErrorCode.INVALID_FORMAT));

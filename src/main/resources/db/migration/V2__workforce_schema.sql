@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     completed_at timestamp,
     assignee_id bigint REFERENCES users(id),
     reporter_id bigint NOT NULL REFERENCES users(id),
-    CONSTRAINT ck_task_type CHECK (type IN ('FEATURE','BUG','RESEARCH','TESTING','DOCUMENTATION')),
+    CONSTRAINT ck_task_type CHECK (type IN ('FEATURE','BUG','RESEARCH')),
     CONSTRAINT ck_task_status CHECK (status IN ('TODO','IN_PROGRESS','IN_REVIEW','DONE','CANCELLED')),
     CONSTRAINT ck_task_priority CHECK (priority IN ('LOW','MEDIUM','HIGH','CRITICAL'))
 );

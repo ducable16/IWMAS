@@ -208,7 +208,7 @@ public class TaskService {
     public TaskResponse updateTask(Long id, TaskRequest request) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
-        validateAssignee(request.getProjectId(), request.getAssigneeId());
+        validateAssignee(task.getProjectId(), task.getAssigneeId());
         Long oldAssigneeId = task.getAssigneeId();
         applyRequest(task, request);
         task = taskRepository.save(task);
@@ -270,6 +270,24 @@ public class TaskService {
                     "Trạng thái task đã thay đổi", statusMsg, "TASK", id);
         }
 
+        return toResponse(task, getSkillRequirements(task.getId()));
+    }
+
+    @Transactional
+    @CacheEvict(value = "kanbanBoard", allEntries = true)
+    public TaskResponse updateTaskDates(Long id, TaskDateUpdateRequest request) {
+        Task task = findTask(id);
+        requireTaskEditAccess(task);
+
+        LocalDate start = request.getStartDate();
+        LocalDate due = request.getDueDate();
+        if (start != null && due != null && start.isAfter(due)) {
+            throw new AppException(ErrorCode.TASK_INVALID_DATE_RANGE);
+        }
+
+        task.setStartDate(start);
+        task.setDueDate(due);
+        task = taskRepository.save(task);
         return toResponse(task, getSkillRequirements(task.getId()));
     }
 
@@ -524,6 +542,7 @@ public class TaskService {
             case "duedate", "due_date" -> "dueDate";
             case "title" -> "title";
             case "updatedat", "updated_at" -> "updatedAt";
+            case "startdate", "start_date" -> "startDate";
             default -> "createdAt";
         };
         return Sort.by(dir, field);

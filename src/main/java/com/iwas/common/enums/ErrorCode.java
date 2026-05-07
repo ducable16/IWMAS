@@ -54,6 +54,7 @@ public enum ErrorCode {
     TASK_INVALID_STATUS_TRANSITION(5002, "Invalid task status transition", HttpStatus.BAD_REQUEST),
     TASK_COMMENT_NOT_FOUND(5003, "Task comment not found", HttpStatus.NOT_FOUND),
     TASK_ASSIGNEE_NOT_PROJECT_MEMBER(5004, "Assignee is not a member of this project", HttpStatus.BAD_REQUEST),
+    TASK_INVALID_DATE_RANGE(5005, "Start date must not be after due date", HttpStatus.BAD_REQUEST),
 
     // --- 6xxx: Time Logs ---
     TIME_LOG_NOT_FOUND(6001, "Time log not found", HttpStatus.NOT_FOUND),

@@ -108,6 +108,12 @@ public class TaskController {
         return taskService.updateTaskStatus(id, request, authenticatedUserResolver.currentUserId());
     }
 
+    @PatchMapping("/{id}/dates")
+    public TaskResponse updateDates(@PathVariable Long id,
+                                    @RequestBody TaskDateUpdateRequest request) {
+        return taskService.updateTaskDates(id, request);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
