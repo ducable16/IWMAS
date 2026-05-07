@@ -1,6 +1,6 @@
 ## Agile SaaS (Jira-like) — MVP Document
 
-Tài liệu này mô tả **MVP Jira-core** cho Roamtrip theo hướng **multi-tenant shared database**, tenant key là `Organization.id` (quy ước `orgId`).
+Tài liệu này mô tả **MVP Jira-core** cho IWS theo hướng **multi-tenant shared database**, tenant key là `Organization.id` (quy ước `orgId`).
 
 ---
 

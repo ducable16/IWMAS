@@ -1,4 +1,4 @@
--- Core schema for Roamtrip (multi-tenant via org_id on projects)
+-- Core schema for IWAS (multi-tenant via org_id on projects)
 
 create table if not exists tenants (
     id bigserial primary key,

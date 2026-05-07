@@ -36,7 +36,7 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    @Value("${app.frontend.base-url:http://localhost:3000}")
+    @Value("${app.frontend.base-url:http://localhost:3000")
     private String frontendBaseUrl;
 
     @PostMapping("/register")
@@ -45,7 +45,6 @@ public class AuthController {
         return authService.register(request);
     }
 
-    // Giữ ResponseEntity vì cần set Location header cho redirect
     @GetMapping("/verify-email")
     public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);

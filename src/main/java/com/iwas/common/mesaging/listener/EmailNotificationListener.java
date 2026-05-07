@@ -19,10 +19,10 @@ public class EmailNotificationListener {
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
 
-    @Value("${app.mail.from:no-reply@roamtrip.local}")
+    @Value("${app.mail.from:no-reply@iwas.local}")
     private String fromAddress;
 
-    @Value("${app.frontend.base-url:http://localhost:5173}")
+    @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl;
 
     @RabbitListener(queues = RabbitMQConfig.EMAIL_QUEUE)

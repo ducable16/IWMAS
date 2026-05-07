@@ -11,6 +11,7 @@ import com.iwas.task.entity.Task;
 import com.iwas.task.enums.TaskType;
 import com.iwas.task.repository.TaskRepository;
 import com.iwas.user.entity.User;
+import com.iwas.user.enums.UserRole;
 import com.iwas.user.repository.UserRepository;
 import com.iwas.workload.dto.BurnoutLogResponse;
 import com.iwas.workload.dto.MemberWorkloadResponse;
@@ -50,13 +51,12 @@ public class WorkloadService {
 
     private static final double DEFAULT_HOURS_PER_DAY = 6.0;
 
-    private static double hoursPerDayForPosition(String position) {
-        if (position == null) return DEFAULT_HOURS_PER_DAY;
-        String p = position.toLowerCase();
-        if (p.contains("developer") || p.contains("engineer") || p.contains("backend") || p.contains("frontend"))
-            return 6.5;
-        if (p.contains("pm") || p.contains("project manager") || p.contains("lead"))
+    private static double hoursPerDayForRole(UserRole role) {
+        if (role == null) return DEFAULT_HOURS_PER_DAY;
+        if (role == UserRole.PROJECT_MANAGER)
             return 5.5;
+        if (role == UserRole.TEAM_MEMBER)
+            return 6.5;
         return DEFAULT_HOURS_PER_DAY;
     }
 
@@ -84,7 +84,7 @@ public class WorkloadService {
     // ─── core helpers ─────────────────────────────────────────────────────────
 
     private BigDecimal effectiveCapacityHours(User user, LocalDate from, LocalDate to) {
-        double hoursPerDay = hoursPerDayForPosition(user.getPosition());
+        double hoursPerDay = hoursPerDayForRole(user.getRole());
         long workdays = from.datesUntil(to.plusDays(1))
                 .filter(d -> d.getDayOfWeek() != DayOfWeek.SATURDAY
                           && d.getDayOfWeek() != DayOfWeek.SUNDAY)
@@ -274,7 +274,6 @@ public class WorkloadService {
         return MemberWorkloadResponse.builder()
                 .userId(user.getId())
                 .userFullName(user.getFullName())
-                .position(user.getPosition())
                 .weekStart(weekStart)
                 .weekEnd(weekEnd)
                 .weeklyCapacityHours(util.weeklyCapacityHours())
