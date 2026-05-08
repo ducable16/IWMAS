@@ -21,6 +21,9 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
 
     Optional<ProjectMember> findByProjectIdAndUserIdAndIsDeletedFalse(Long projectId, Long userId);
 
+    @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.projectId = :projectId AND pm.userId = :userId AND pm.leaveDate IS NULL")
+    Optional<ProjectMember> findActiveMemberByProjectIdAndUserId(@Param("projectId") Long projectId, @Param("userId") Long userId);
+
     @Query("""
             SELECT SUM(pm.allocatedEffortPercent)
             FROM ProjectMember pm

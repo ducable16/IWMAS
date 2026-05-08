@@ -342,7 +342,7 @@ public class ProjectService {
     }
 
     public boolean isMemberOf(Long projectId, Long userId) {
-        return projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, userId).isPresent();
+        return projectMemberRepository.findActiveMemberByProjectIdAndUserId(projectId, userId).isPresent();
     }
 
     public boolean isProjectParticipant(Long projectId, Long userId) {
@@ -455,10 +455,6 @@ public class ProjectService {
                 .build();
     }
 
-    /**
-     * Two date ranges overlap when neither ends strictly before the other starts.
-     * Null means open-ended (no bound in that direction).
-     */
     private boolean periodsOverlap(LocalDate s1, LocalDate e1, LocalDate s2, LocalDate e2) {
         boolean s1AfterE2 = s1 != null && e2 != null && s1.isAfter(e2);
         boolean s2AfterE1 = s2 != null && e1 != null && s2.isAfter(e1);

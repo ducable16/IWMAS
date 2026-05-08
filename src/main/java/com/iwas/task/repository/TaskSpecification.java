@@ -67,7 +67,9 @@ public class TaskSpecification {
             if (filter.getLabels() != null && !filter.getLabels().isEmpty()) {
                 SetJoin<Task, String> labelsJoin = root.joinSet("labels", JoinType.INNER);
                 predicates.add(labelsJoin.in(filter.getLabels()));
-                query.distinct(true);
+                if (query.getResultType() != Long.class) {
+                    query.distinct(true);
+                }
             }
 
             if (filter.getCustomFields() != null && !filter.getCustomFields().isEmpty()) {
@@ -78,7 +80,9 @@ public class TaskSpecification {
                             cb.equal(cfJoin.value(), entry.getValue())
                     ));
                 }
-                query.distinct(true);
+                if (query.getResultType() != Long.class) {
+                    query.distinct(true);
+                }
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
