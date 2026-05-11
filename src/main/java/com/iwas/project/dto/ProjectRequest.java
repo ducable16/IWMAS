@@ -3,6 +3,7 @@ package com.iwas.project.dto;
 import com.iwas.project.enums.ProjectStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -15,7 +16,10 @@ public class ProjectRequest {
     @Size(max = 200, message = "Name must be at most 200 characters")
     private String name;
 
-    @Size(max = 50, message = "Code must be at most 50 characters")
+    @Pattern(
+            regexp = "^[A-Za-z0-9-]{2,10}$",
+            message = "Code must be 2–10 characters: letters, digits, or hyphens"
+    )
     private String code;
 
     private String description;

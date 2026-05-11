@@ -22,6 +22,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpec
 
     Optional<Project> findByCodeAndIsDeletedFalse(String code);
 
+    @Query("SELECT COUNT(p) > 0 FROM Project p WHERE LOWER(p.code) = LOWER(:code) AND p.isDeleted = false")
+    boolean existsByCodeIgnoreCase(String code);
+
     @Query("SELECT p FROM Project p WHERE p.isDeleted = false AND p.id IN :ids ORDER BY p.createdAt DESC")
     List<Project> findActiveByIds(List<Long> ids);
 }

@@ -9,6 +9,7 @@ import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.dto.*;
 import com.iwas.project.entity.Project;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.iwas.project.entity.ProjectMember;
 import com.iwas.project.enums.ProjectStatus;
 import com.iwas.project.repository.ProjectMemberRepository;
@@ -49,6 +50,7 @@ public class ProjectService {
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final ProjectIndexEventPublisher projectIndexEventPublisher;
     private final NotificationService notificationService;
+    private final ProjectCodeService projectCodeService;
 
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
         String role = authenticatedUserResolver.currentUserRole();
@@ -163,16 +165,22 @@ public class ProjectService {
         return toProjectResponse(project);
     }
 
+    public ProjectCodeSuggestResponse suggestCode(String name) {
+        return projectCodeService.suggest(name);
+    }
+
     @Transactional
     public ProjectResponse createProject(ProjectRequest request) {
-        if (request.getCode() != null && !request.getCode().isBlank()) {
-            projectRepository.findByCodeAndIsDeletedFalse(request.getCode())
-                    .ifPresent(p -> { throw new AppException(ErrorCode.PROJECT_CODE_ALREADY_EXISTS); });
+        String code;
+        try {
+            code = projectCodeService.resolveForCreate(request.getCode(), request.getName());
+        } catch (DataIntegrityViolationException ex) {
+            throw new AppException(ErrorCode.PROJECT_CODE_ALREADY_EXISTS);
         }
 
         Project project = new Project();
         project.setName(request.getName().trim());
-        project.setCode(request.getCode());
+        project.setCode(code);
         project.setDescription(request.getDescription());
         project.setStatus(request.getStatus());
         project.setStartDate(request.getStartDate());
@@ -186,6 +194,14 @@ public class ProjectService {
     @Transactional
     public ProjectResponse updateProject(Long id, ProjectRequest request) {
         Project project = findProject(id);
+
+        if (request.getCode() != null && !request.getCode().isBlank()) {
+            String normalized = projectCodeService.normalize(request.getCode());
+            if (!normalized.equals(project.getCode())) {
+                throw new AppException(ErrorCode.PROJECT_CODE_IMMUTABLE);
+            }
+        }
+
         project.setName(request.getName().trim());
         project.setDescription(request.getDescription());
         project.setStatus(request.getStatus());

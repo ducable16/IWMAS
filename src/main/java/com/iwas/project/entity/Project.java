@@ -26,7 +26,7 @@ public class Project extends BaseEntity {
     @Column(name = "name", nullable = false, length = 200)
     private String name;
 
-    @Column(name = "code", unique = true, length = 50)
+    @Column(name = "code", unique = true, length = 10, updatable = false)
     private String code;
 
     @Column(name = "description", columnDefinition = "TEXT")

@@ -33,6 +33,12 @@ public class ProjectController {
         return projectService.searchMyProjects(authenticatedUserResolver.currentUserId(), filter);
     }
 
+    @GetMapping("/suggest-code")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    public ProjectCodeSuggestResponse suggestCode(@RequestParam String name) {
+        return projectService.suggestCode(name);
+    }
+
     @GetMapping("/{id}")
     public ProjectResponse getById(@PathVariable Long id) {
         return projectService.getProjectById(id);

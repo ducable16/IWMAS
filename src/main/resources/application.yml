@@ -9,7 +9,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
   rabbitmq:
     host: localhost
     port: 5672

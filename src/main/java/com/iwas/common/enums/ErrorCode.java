@@ -45,6 +45,8 @@ public enum ErrorCode {
     // --- 4xxx: Projects ---
     PROJECT_NOT_FOUND(4001, "Project not found", HttpStatus.NOT_FOUND),
     PROJECT_CODE_ALREADY_EXISTS(4002, "Project code already exists", HttpStatus.CONFLICT),
+    PROJECT_CODE_INVALID(4006, "Project code must be 2–10 uppercase letters, digits, or hyphens", HttpStatus.BAD_REQUEST),
+    PROJECT_CODE_IMMUTABLE(4007, "Project code cannot be changed after creation", HttpStatus.CONFLICT),
     PROJECT_MEMBER_NOT_FOUND(4003, "Project member not found", HttpStatus.NOT_FOUND),
     PROJECT_MEMBER_ALREADY_EXISTS(4004, "User is already a member of this project", HttpStatus.CONFLICT),
     USER_OVER_ALLOCATED(4005, "User's total allocation across active projects would exceed 100%", HttpStatus.CONFLICT),
