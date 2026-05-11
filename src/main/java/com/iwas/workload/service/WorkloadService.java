@@ -2,6 +2,7 @@ package com.iwas.workload.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.notification.NotificationMessages;
 import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.entity.Project;
@@ -250,9 +251,7 @@ public class WorkloadService {
         if (util.workloadLevel() == WorkloadLevel.OVERLOADED) {
             notificationService.send(
                     userId, NotificationType.OVERLOAD_WARNING,
-                    "Cảnh báo quá tải công việc",
-                    "Workload tuần này đạt " + util.utilizationPercent().toPlainString()
-                            + "% năng lực. Hãy kiểm tra và điều chỉnh khối lượng công việc.",
+                    NotificationMessages.overloadWarning(util.utilizationPercent().toPlainString()),
                     "WORKLOAD", saved.getId());
         }
 

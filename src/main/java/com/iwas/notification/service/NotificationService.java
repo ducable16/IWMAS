@@ -2,6 +2,7 @@ package com.iwas.notification.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.notification.NotificationMessages;
 import com.iwas.notification.dto.NotificationResponse;
 import com.iwas.notification.entity.Notification;
 import com.iwas.notification.enums.NotificationType;
@@ -54,6 +55,11 @@ public class NotificationService {
     @Transactional
     public void markAllAsRead(Long userId) {
         notificationRepository.markAllAsRead(userId);
+    }
+
+    public Notification send(Long recipientId, NotificationType type, NotificationMessages.NotificationContent msg,
+                              String referenceType, Long referenceId) {
+        return send(recipientId, type, msg.title(), msg.content(), referenceType, referenceId);
     }
 
     public Notification send(Long recipientId, NotificationType type, String title, String content,

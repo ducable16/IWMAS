@@ -2,6 +2,7 @@ package com.iwas.task.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.notification.NotificationMessages;
 import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.task.dto.TaskCommentRequest;
@@ -104,8 +105,7 @@ public class TaskCommentService {
                     .filter(u -> !u.getId().equals(authorId))
                     .forEach(u -> notificationService.send(
                             u.getId(), NotificationType.COMMENT_MENTION,
-                            "Bạn được nhắc đến trong một bình luận",
-                            "Bạn được @mention trong task \"" + task.getTitle() + "\".",
+                            NotificationMessages.commentMention(task.getTitle()),
                             "TASK", task.getId()));
         }
     }

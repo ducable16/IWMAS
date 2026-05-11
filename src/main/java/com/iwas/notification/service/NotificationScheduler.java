@@ -1,5 +1,6 @@
 package com.iwas.notification.service;
 
+import com.iwas.notification.NotificationMessages;
 import com.iwas.notification.enums.NotificationType;
 import com.iwas.task.entity.Task;
 import com.iwas.task.repository.TaskRepository;
@@ -29,8 +30,7 @@ public class NotificationScheduler {
         for (Task task : overdueTasks) {
             notificationService.send(
                     task.getAssigneeId(), NotificationType.TASK_OVERDUE,
-                    "Task của bạn đã quá hạn",
-                    "Task \"" + task.getTitle() + "\" đã quá hạn kể từ " + task.getDueDate() + ".",
+                    NotificationMessages.taskOverdue(task.getTitle(), task.getDueDate()),
                     "TASK", task.getId());
             task.setLastOverdueNotifiedAt(today);
             taskRepository.save(task);
@@ -47,8 +47,7 @@ public class NotificationScheduler {
             long daysLeft = ChronoUnit.DAYS.between(today, task.getDueDate());
             notificationService.send(
                     task.getAssigneeId(), NotificationType.DEADLINE_REMINDER,
-                    "Task sắp đến hạn",
-                    "Task \"" + task.getTitle() + "\" sẽ đến hạn sau " + daysLeft + " ngày.",
+                    NotificationMessages.deadlineReminder(task.getTitle(), daysLeft),
                     "TASK", task.getId());
         }
         log.info("[Scheduler] Sent deadline reminders for {} task(s)", tasks.size());

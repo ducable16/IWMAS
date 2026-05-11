@@ -4,6 +4,7 @@ import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
 import com.iwas.common.mesaging.event.ProjectIndexEvent;
 import com.iwas.common.mesaging.publisher.ProjectIndexEventPublisher;
+import com.iwas.notification.NotificationMessages;
 import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.dto.*;
@@ -242,8 +243,7 @@ public class ProjectService {
 
         notificationService.send(
                 request.getUserId(), NotificationType.PROJECT_ADDED,
-                "Bạn được thêm vào project",
-                "Bạn đã được thêm vào project \"" + project.getName() + "\".",
+                NotificationMessages.projectAdded(project.getName()),
                 "PROJECT", projectId);
 
         return toMemberResponse(saved, userName);
@@ -407,7 +407,7 @@ public class ProjectService {
                 .map(pm -> {
                     Project p = projectMap.get(pm.getProjectId());
                     LocalDate s = p.getStartDate() != null ? p.getStartDate() : LocalDate.of(2000, 1, 1);
-                    LocalDate e = p.getEndDate()   != null ? p.getEndDate()   : LocalDate.of(9999, 12, 31);
+                    LocalDate e = p.getEndDate()   != null ? p.getEndDate()   : LocalDate.of(9999, 12, 30);
                     return new AllocationInterval(s, e, pm.getAllocatedEffortPercent(),
                             p.getId(), p.getName(), p.getCode());
                 })

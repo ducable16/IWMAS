@@ -2,6 +2,7 @@ package com.iwas.task.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.notification.NotificationMessages;
 import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.service.ProjectService;
@@ -195,8 +196,7 @@ public class TaskService {
         if (task.getAssigneeId() != null) {
             notificationService.send(
                     task.getAssigneeId(), NotificationType.TASK_ASSIGNED,
-                    "Bạn được giao một task mới",
-                    "Task \"" + task.getTitle() + "\" đã được giao cho bạn.",
+                    NotificationMessages.newTaskAssigned(task.getTitle()),
                     "TASK", task.getId());
         }
 
@@ -222,8 +222,7 @@ public class TaskService {
         if (newAssigneeId != null && !newAssigneeId.equals(oldAssigneeId)) {
             notificationService.send(
                     newAssigneeId, NotificationType.TASK_ASSIGNED,
-                    "Bạn được giao một task",
-                    "Task \"" + task.getTitle() + "\" đã được giao cho bạn.",
+                    NotificationMessages.taskReassigned(task.getTitle()),
                     "TASK", task.getId());
         }
 
@@ -259,15 +258,16 @@ public class TaskService {
         }
         task = taskRepository.save(task);
 
-        String statusMsg = "Task \"" + task.getTitle() + "\" chuyển sang " + request.getStatus().getDisplayName() + ".";
+        NotificationMessages.NotificationContent statusMsg =
+                NotificationMessages.taskStatusChanged(task.getTitle(), request.getStatus().getDisplayName());
         if (task.getAssigneeId() != null && !task.getAssigneeId().equals(changedById)) {
             notificationService.send(task.getAssigneeId(), NotificationType.TASK_STATUS_CHANGED,
-                    "Trạng thái task đã thay đổi", statusMsg, "TASK", id);
+                    statusMsg, "TASK", id);
         }
         if (task.getReporterId() != null && !task.getReporterId().equals(changedById)
                 && !task.getReporterId().equals(task.getAssigneeId())) {
             notificationService.send(task.getReporterId(), NotificationType.TASK_STATUS_CHANGED,
-                    "Trạng thái task đã thay đổi", statusMsg, "TASK", id);
+                    statusMsg, "TASK", id);
         }
 
         return toResponse(task, getSkillRequirements(task.getId()));
