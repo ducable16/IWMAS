@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/users")
@@ -45,6 +46,11 @@ public class UserController {
     @PatchMapping("/me/password")
     public String changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         return userService.changePassword(authenticatedUserResolver.currentUserId(), request);
+    }
+
+    @PostMapping("/me/avatar")
+    public UserMeResponse uploadAvatar(@RequestParam("file") MultipartFile file) {
+        return userService.uploadAvatar(authenticatedUserResolver.currentUserId(), file);
     }
 
     @PostMapping

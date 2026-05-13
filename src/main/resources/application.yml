@@ -1,6 +1,10 @@
 spring:
   application:
     name: Workforce
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
   datasource:
     url: jdbc:postgresql://localhost:5432/workforce
     username: postgres
@@ -71,6 +75,12 @@ app:
       max-page-size: 50
   frontend:
     base-url: http://localhost:3000
+  storage:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: iwas
+    region: us-east-1
   jwt:
     secret: hs5p8JHcpEdoZeiE5uRIDCev4rMczXRP
     access-expiration-ms: 3600000

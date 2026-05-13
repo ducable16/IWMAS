@@ -11,6 +11,10 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(500, "Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR),
 
     // --- 9xxx: System & Defaults ---
+    FILE_TOO_LARGE(9991, "File size exceeds the allowed limit", HttpStatus.BAD_REQUEST),
+    FILE_TYPE_NOT_ALLOWED(9992, "File type is not allowed", HttpStatus.BAD_REQUEST),
+    ATTACHMENT_NOT_FOUND(9993, "Attachment not found", HttpStatus.NOT_FOUND),
+    DOCUMENT_NOT_FOUND(9994, "Document not found", HttpStatus.NOT_FOUND),
     UPLOAD_FAILED(9997, "Upload failed", HttpStatus.INTERNAL_SERVER_ERROR),
     URL_NOT_FOUND(9998, "URL not found", HttpStatus.NOT_FOUND),
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),

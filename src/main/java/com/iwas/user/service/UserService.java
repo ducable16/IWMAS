@@ -5,6 +5,8 @@ import com.iwas.auth.dto.UpdateProfileRequest;
 import com.iwas.auth.service.AuthService;
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.common.storage.FileValidator;
+import com.iwas.common.storage.StorageService;
 import com.iwas.user.dto.CreateUserRequest;
 import com.iwas.user.dto.UpdateUserRequest;
 import com.iwas.user.dto.UserFilterRequest;
@@ -22,6 +24,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +35,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
+    private final StorageService storageService;
+    private final FileValidator fileValidator;
 
     public UserMeResponse getMe(Long userId) {
         return authService.toMeResponse(findUser(userId));
@@ -145,8 +152,27 @@ public class UserService {
         return authService.toMeResponse(user);
     }
 
+    @Transactional
+    public UserMeResponse uploadAvatar(Long userId, MultipartFile file) {
+        fileValidator.validateAvatar(file);
+        User user = findUser(userId);
+        String ext = resolveExtension(file.getOriginalFilename());
+        String key = "avatars/" + userId + "/" + UUID.randomUUID() + ext;
+        storageService.upload(file, key);
+        user.setAvatarUrl(storageService.getUrl(key));
+        userRepository.save(user);
+        return authService.toMeResponse(user);
+    }
+
     private User findUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    private String resolveExtension(String filename) {
+        if (filename != null && filename.contains(".")) {
+            return filename.substring(filename.lastIndexOf('.'));
+        }
+        return "";
     }
 }
