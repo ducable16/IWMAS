@@ -30,8 +30,9 @@ public class SearchController {
     @GetMapping("/autocomplete")
     public AutocompleteResponse autocomplete(
             @RequestParam("q") @NotBlank String q,
-            @RequestParam(value = "projectId", required = false) Long projectId) {
-        return searchService.autocomplete(q, projectId);
+            @RequestParam(value = "projectId", required = false) Long projectId,
+            @RequestParam(value = "excludeProjectId", required = false) Long excludeProjectId) {
+        return searchService.autocomplete(q, projectId, excludeProjectId);
     }
 
     @GetMapping("/search")

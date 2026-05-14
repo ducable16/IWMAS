@@ -12,6 +12,7 @@ import com.iwas.task.entity.TaskComment;
 import com.iwas.task.repository.TaskCommentRepository;
 import com.iwas.task.repository.TaskRepository;
 import com.iwas.user.dto.UserMeResponse;
+import com.iwas.user.dto.UserPublicView;
 import com.iwas.user.entity.User;
 import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
@@ -136,14 +137,14 @@ public class TaskCommentService {
         return TaskCommentResponse.builder()
                 .id(c.getId())
                 .taskId(c.getTaskId())
-                .author(toUserMeResponse(author))
+                .author(toPublicView(author))
                 .content(c.getContent())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();
     }
 
-    private UserMeResponse toUserMeResponse(User user) {
-        return UserMapper.toUserMeResponse(user);
+    private UserPublicView toPublicView(User user) {
+        return UserMapper.toPublicView(user);
     }
 }

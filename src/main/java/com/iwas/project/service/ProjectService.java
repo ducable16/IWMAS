@@ -328,6 +328,15 @@ public class ProjectService {
 
     // --- Member search ---
 
+    public Set<Long> getExistingParticipantIds(Long projectId) {
+        Project project = findProject(projectId);
+        Set<Long> ids = projectMemberRepository.findByProjectId(projectId)
+                .stream().map(ProjectMember::getUserId)
+                .collect(Collectors.toCollection(HashSet::new));
+        ids.add(project.getManagerId());
+        return ids;
+    }
+
     public List<UserMeResponse> searchProjectMembers(Long projectId, String q, int size) {
         Project project = findProject(projectId);
         requireProjectAccess(projectId);

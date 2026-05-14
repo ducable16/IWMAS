@@ -7,12 +7,14 @@ import com.iwas.search.dto.SuggestionItem;
 import com.iwas.search.dto.UserSearchResult;
 
 import java.util.List;
+import java.util.Set;
 
 public interface SearchFallbackService {
 
     // --- User ---
     SearchResponse<UserSearchResult> searchUsers(SearchRequest request);
     List<SuggestionItem> autocompleteUsers(String prefix, int topN);
+    List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds);
 
     // --- Project ---
     SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request);

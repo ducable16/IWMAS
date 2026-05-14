@@ -20,6 +20,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -75,6 +76,32 @@ public class DatabaseAdapter implements SearchFallbackService {
                 .size(topN)
                 .build();
         return searchUsers(req).getItems().stream()
+                .map(u -> SuggestionItem.builder()
+                        .term(u.getFullName())
+                        .entityId(u.getId())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds) {
+        String like = "%" + prefix.toLowerCase() + "%";
+
+        Specification<User> spec = (root, q, cb) -> {
+            jakarta.persistence.criteria.Predicate base = cb.and(
+                    cb.equal(root.get("isDeleted"), false),
+                    cb.or(
+                            cb.like(cb.lower(root.get("fullName")), like),
+                            cb.like(cb.lower(root.get("position")), like),
+                            cb.like(cb.lower(root.get("email")), like)));
+            if (!excludeIds.isEmpty()) {
+                return cb.and(base, cb.not(root.get("id").in(excludeIds)));
+            }
+            return base;
+        };
+
+        PageRequest pageable = PageRequest.of(0, topN, Sort.by(Sort.Direction.ASC, "fullName"));
+        return userRepository.findAll(spec, pageable).getContent().stream()
                 .map(u -> SuggestionItem.builder()
                         .term(u.getFullName())
                         .entityId(u.getId())

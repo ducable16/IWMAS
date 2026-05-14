@@ -16,6 +16,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -35,7 +36,7 @@ public class SearchService {
     // User
     // -------------------------------------------------------------------------
 
-    public AutocompleteResponse autocomplete(String query, Long projectId) {
+    public AutocompleteResponse autocomplete(String query, Long projectId, Long excludeProjectId) {
         long start = System.currentTimeMillis();
         String prefix = normalize(query);
         int minLen = properties.getAutocomplete().getMinPrefixLength();
@@ -53,6 +54,24 @@ public class SearchService {
                     .toList();
             return AutocompleteResponse.builder()
                     .prefix(prefix).suggestions(suggestions).source("database")
+                    .tookMs(System.currentTimeMillis() - start).build();
+        }
+
+        if (excludeProjectId != null) {
+            Set<Long> excludeIds = projectService.getExistingParticipantIds(excludeProjectId);
+            List<SuggestionItem> suggestions = List.of();
+            String source = "elasticsearch";
+            try {
+                suggestions = engine.autocompleteUsersExcluding(prefix, topN, excludeIds);
+            } catch (Exception e) {
+                log.warn("Elasticsearch autocomplete (exclude) failed, falling back to DB: {}", e.getMessage());
+            }
+            if (suggestions.isEmpty()) {
+                suggestions = fallback.autocompleteUsersExcluding(prefix, topN, excludeIds);
+                source = "database";
+            }
+            return AutocompleteResponse.builder()
+                    .prefix(prefix).suggestions(suggestions).source(source)
                     .tookMs(System.currentTimeMillis() - start).build();
         }
 

@@ -21,6 +21,7 @@ import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -87,6 +88,34 @@ public class ElasticsearchAdapter implements ElasticsearchService {
                 .should(s -> s.matchPhrasePrefix(p -> p.field("fullName").query(prefix)))
                 .should(s -> s.matchPhrasePrefix(p -> p.field("position").query(prefix)))
                 .filter(f -> f.term(t -> t.field("isActive").value(true)))));
+
+        NativeQuery nq = NativeQuery.builder()
+                .withQuery(query)
+                .withPageable(PageRequest.of(0, topN))
+                .build();
+
+        SearchHits<UserSearchDocument> hits = elasticsearchOperations.search(nq, UserSearchDocument.class);
+
+        return hits.getSearchHits().stream()
+                .map(h -> SuggestionItem.builder()
+                        .term(h.getContent().getFullName())
+                        .entityId(h.getContent().getId())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds) {
+        Query query = Query.of(q -> q.bool(b -> {
+            b.should(s -> s.matchPhrasePrefix(p -> p.field("fullName").query(prefix)))
+             .should(s -> s.matchPhrasePrefix(p -> p.field("position").query(prefix)))
+             .filter(f -> f.term(t -> t.field("isActive").value(true)));
+            if (!excludeIds.isEmpty()) {
+                List<String> idStrings = excludeIds.stream().map(String::valueOf).toList();
+                b.mustNot(mn -> mn.ids(i -> i.values(idStrings)));
+            }
+            return b;
+        }));
 
         NativeQuery nq = NativeQuery.builder()
                 .withQuery(query)

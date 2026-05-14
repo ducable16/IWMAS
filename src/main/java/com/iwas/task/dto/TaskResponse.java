@@ -4,6 +4,7 @@ import com.iwas.task.enums.TaskPriority;
 import com.iwas.task.enums.TaskStatus;
 import com.iwas.task.enums.TaskType;
 import com.iwas.user.dto.UserMeResponse;
+import com.iwas.user.dto.UserPublicView;
 import lombok.Builder;
 import lombok.Data;
 
@@ -31,8 +32,8 @@ public class TaskResponse {
     private LocalDateTime completedAt;
     private String sprint;
     private Set<String> labels;
-    private UserMeResponse assignee;
-    private UserMeResponse reporter;
+    private UserPublicView assignee;
+    private UserPublicView reporter;
     private List<TaskSkillRequirementResponse> skillRequirements;
     private Map<String, String> customFields;
     private List<TaskCommentResponse> comments;  // only populated on task detail
