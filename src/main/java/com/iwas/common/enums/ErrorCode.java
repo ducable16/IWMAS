@@ -54,6 +54,7 @@ public enum ErrorCode {
     PROJECT_MEMBER_NOT_FOUND(4003, "Project member not found", HttpStatus.NOT_FOUND),
     PROJECT_MEMBER_ALREADY_EXISTS(4004, "User is already a member of this project", HttpStatus.CONFLICT),
     USER_OVER_ALLOCATED(4005, "User's total allocation across active projects would exceed 100%", HttpStatus.CONFLICT),
+    PROJECT_MEMBER_ALLOC_REQUIRED(4008, "Allocated effort percent is required", HttpStatus.BAD_REQUEST),
 
     // --- 5xxx: Tasks ---
     TASK_NOT_FOUND(5001, "Task not found", HttpStatus.NOT_FOUND),

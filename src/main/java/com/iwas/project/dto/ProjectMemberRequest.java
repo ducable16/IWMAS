@@ -16,6 +16,7 @@ public class ProjectMemberRequest {
 
     private ProjectRoleInProject roleInProject = ProjectRoleInProject.MEMBER;
 
+    @NotNull(message = "Allocated effort percent is required")
     @Min(value = 0, message = "Allocated effort must be at least 0")
     @Max(value = 100, message = "Allocated effort must be at most 100")
     private Integer allocatedEffortPercent;

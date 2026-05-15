@@ -289,7 +289,10 @@ public class ProjectService {
      * the surrounding @Transactional boundary.
      */
     private void checkAllocationLimit(Long userId, Integer newAllocation, Long excludeMemberId) {
-        if (newAllocation == null || newAllocation == 0) return;
+        if (newAllocation == null) {
+            throw new AppException(ErrorCode.PROJECT_MEMBER_ALLOC_REQUIRED);
+        }
+        if (newAllocation == 0) return;
 
         userRepository.findByIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
