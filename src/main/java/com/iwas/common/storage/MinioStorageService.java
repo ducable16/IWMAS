@@ -12,9 +12,14 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+
+import java.time.Duration;
 
 @Slf4j
 @Service
@@ -22,12 +27,13 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 public class MinioStorageService implements StorageService {
 
     private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
 
     @Value("${app.storage.bucket}")
     private String bucket;
 
-    @Value("${app.storage.endpoint}")
-    private String endpoint;
+    @Value("${app.storage.presigned-url-expiration-minutes:60}")
+    private long presignedUrlExpirationMinutes;
 
     @PostConstruct
     public void initBucket() {
@@ -63,7 +69,14 @@ public class MinioStorageService implements StorageService {
 
     @Override
     public String getUrl(String key) {
-        return endpoint + "/" + bucket + "/" + key;
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(presignedUrlExpirationMinutes))
+                .getObjectRequest(GetObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .build())
+                .build();
+        return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
     @Override
