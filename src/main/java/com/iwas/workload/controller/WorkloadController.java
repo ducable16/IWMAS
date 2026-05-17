@@ -24,8 +24,7 @@ public class WorkloadController {
 
     @GetMapping("/team")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public List<WorkloadSnapshotResponse> getTeamWorkload(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    public List<WorkloadSnapshotResponse> getTeamWorkload(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return workloadService.getTeamWorkload(date);
     }
 

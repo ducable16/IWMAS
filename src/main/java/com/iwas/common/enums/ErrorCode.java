@@ -40,6 +40,11 @@ public enum ErrorCode {
     REFRESH_TOKEN_REVOKED(1020, "Refresh token has been revoked", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_EXPIRED(1021, "Refresh token has expired", HttpStatus.UNAUTHORIZED),
 
+    // --- 2xxx: AHP / Recommendation ---
+    AHP_WEIGHT_SET_NOT_FOUND(2001, "AHP weight set not found", HttpStatus.NOT_FOUND),
+    AHP_INVALID_TFN(2002, "Invalid TFN (require l <= m <= u and each in [1/9, 9])", HttpStatus.BAD_REQUEST),
+    AHP_NO_ACTIVE_WEIGHT_SET(2003, "No active AHP weight set has been configured", HttpStatus.NOT_FOUND),
+
     // --- 3xxx: Skills ---
     SKILL_NOT_FOUND(3001, "Skill not found", HttpStatus.NOT_FOUND),
     SKILL_ALREADY_EXISTS(3002, "Skill already exists", HttpStatus.CONFLICT),

@@ -8,6 +8,7 @@ import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
 import com.iwas.search.dto.UserSearchResult;
+import com.iwas.common.storage.StorageService;
 import com.iwas.search.service.SearchFallbackService;
 import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
@@ -31,6 +32,7 @@ public class DatabaseAdapter implements SearchFallbackService {
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
     private final SearchProperties properties;
+    private final StorageService storageService;
 
     // -------------------------------------------------------------------------
     // User
@@ -169,7 +171,7 @@ public class DatabaseAdapter implements SearchFallbackService {
                 .email(u.getEmail())
                 .fullName(u.getFullName())
                 .position(u.getPosition())
-                .avatarUrl(u.getAvatarUrl())
+                .avatarUrl(storageService.resolveUrl(u.getAvatarUrl()))
                 .role(u.getRole() == null ? null : u.getRole().name())
                 .build();
     }

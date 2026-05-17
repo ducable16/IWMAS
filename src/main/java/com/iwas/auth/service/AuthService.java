@@ -10,6 +10,7 @@ import com.iwas.auth.dto.SendOtpRequest;
 import com.iwas.auth.dto.VerifyOtpRequest;
 import com.iwas.auth.entity.*;
 import com.iwas.common.mesaging.publisher.EmailNotificationPublisher;
+import com.iwas.common.storage.StorageService;
 import com.iwas.user.dto.UserMeResponse;
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.user.entity.User;
@@ -42,6 +43,7 @@ public class AuthService {
     private final EmailNotificationPublisher emailNotificationPublisher;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final StorageService storageService;
 
     private static final int OTP_MAX_ATTEMPTS = 5;
     private static final int OTP_EXPIRY_MINUTES = 5;
@@ -258,7 +260,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(storageService.resolveUrl(user.getAvatarUrl()))
                 .position(user.getPosition())
                 .role(user.getRole())
                 .verified(user.getIsVerified())

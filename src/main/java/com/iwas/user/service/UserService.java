@@ -37,6 +37,7 @@ public class UserService {
     private final AuthService authService;
     private final StorageService storageService;
     private final FileValidator fileValidator;
+    private final UserMapper userMapper;
 
     public UserMeResponse getMe(Long userId) {
         return authService.toMeResponse(findUser(userId));
@@ -138,9 +139,9 @@ public class UserService {
 
     private Object mapByRole(User user, UserRole role) {
         return switch (role) {
-            case ADMIN -> UserMapper.toAdminView(user);
-            case HR -> UserMapper.toHRView(user);
-            default -> UserMapper.toPublicView(user);
+            case ADMIN -> userMapper.toAdminView(user);
+            case HR -> userMapper.toHRView(user);
+            default -> userMapper.toPublicView(user);
         };
     }
 
@@ -159,7 +160,7 @@ public class UserService {
         String ext = resolveExtension(file.getOriginalFilename());
         String key = "avatars/" + userId + "/" + UUID.randomUUID() + ext;
         storageService.upload(file, key);
-        user.setAvatarUrl(storageService.getUrl(key));
+        user.setAvatarUrl(key);
         userRepository.save(user);
         return authService.toMeResponse(user);
     }

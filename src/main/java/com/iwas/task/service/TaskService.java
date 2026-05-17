@@ -52,6 +52,7 @@ public class TaskService {
     private final ProjectService projectService;
     private final NotificationService notificationService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final UserMapper userMapper;
 
     @Lazy
     @Autowired
@@ -498,8 +499,8 @@ public class TaskService {
                 .sprint(t.getSprint())
                 .labels(t.getLabels())
                 .customFields(t.getCustomFields())
-                .assignee(UserMapper.toPublicView(assignee))
-                .reporter(UserMapper.toPublicView(reporter))
+                .assignee(userMapper.toPublicView(assignee))
+                .reporter(userMapper.toPublicView(reporter))
                 .skillRequirements(skillReqs)
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
@@ -525,8 +526,8 @@ public class TaskService {
                 .completedAt(t.getCompletedAt())
                 .labels(t.getLabels())
                 .customFields(t.getCustomFields())
-                .assignee(UserMapper.toPublicView(assignee))
-                .reporter(UserMapper.toPublicView(reporter))
+                .assignee(userMapper.toPublicView(assignee))
+                .reporter(userMapper.toPublicView(reporter))
                 .skillRequirements(getSkillRequirements(t.getId()))
                 .comments(comments)
                 .createdAt(t.getCreatedAt())

@@ -1,23 +1,28 @@
 package com.iwas.user.mapper;
 
+import com.iwas.common.storage.StorageService;
 import com.iwas.user.dto.UserAdminView;
 import com.iwas.user.dto.UserHRView;
 import com.iwas.user.dto.UserMeResponse;
 import com.iwas.user.dto.UserPublicView;
 import com.iwas.user.entity.User;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
-public final class UserMapper {
+@Component
+@RequiredArgsConstructor
+public class UserMapper {
 
-    private UserMapper() {}
+    private final StorageService storageService;
 
-    public static UserMeResponse toUserMeResponse(User user) {
+    public UserMeResponse toUserMeResponse(User user) {
         if (user == null) return null;
         return UserMeResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(storageService.resolveUrl(user.getAvatarUrl()))
                 .position(user.getPosition())
                 .role(user.getRole())
                 .verified(user.getIsVerified())
@@ -25,14 +30,14 @@ public final class UserMapper {
                 .build();
     }
 
-    public static UserAdminView toAdminView(User user) {
+    public UserAdminView toAdminView(User user) {
         if (user == null) return null;
         return UserAdminView.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(storageService.resolveUrl(user.getAvatarUrl()))
                 .position(user.getPosition())
                 .role(user.getRole())
                 .verified(user.getIsVerified())
@@ -42,14 +47,14 @@ public final class UserMapper {
                 .build();
     }
 
-    public static UserHRView toHRView(User user) {
+    public UserHRView toHRView(User user) {
         if (user == null) return null;
         return UserHRView.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(storageService.resolveUrl(user.getAvatarUrl()))
                 .position(user.getPosition())
                 .role(user.getRole())
                 .verified(user.getIsVerified())
@@ -58,13 +63,13 @@ public final class UserMapper {
                 .build();
     }
 
-    public static UserPublicView toPublicView(User user) {
+    public UserPublicView toPublicView(User user) {
         if (user == null) return null;
         return UserPublicView.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(storageService.resolveUrl(user.getAvatarUrl()))
                 .position(user.getPosition())
                 .role(user.getRole())
                 .build();

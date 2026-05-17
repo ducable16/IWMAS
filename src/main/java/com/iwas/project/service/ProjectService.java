@@ -51,6 +51,7 @@ public class ProjectService {
     private final ProjectIndexEventPublisher projectIndexEventPublisher;
     private final NotificationService notificationService;
     private final ProjectCodeService projectCodeService;
+    private final UserMapper userMapper;
 
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
         String role = authenticatedUserResolver.currentUserRole();
@@ -357,7 +358,7 @@ public class ProjectService {
         List<User> users = userRepository.searchByIdsAndKeyword(
                 new ArrayList<>(participantIds), keyword, PageRequest.of(0, limit));
 
-        return users.stream().map(UserMapper::toUserMeResponse).toList();
+        return users.stream().map(userMapper::toUserMeResponse).toList();
     }
 
     // --- Access control helpers ---

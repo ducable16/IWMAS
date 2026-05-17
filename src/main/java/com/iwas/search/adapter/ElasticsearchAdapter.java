@@ -11,6 +11,7 @@ import com.iwas.search.entity.ProjectSearchDocument;
 import com.iwas.search.entity.UserSearchDocument;
 import com.iwas.search.repository.ElasticsearchProjectRepository;
 import com.iwas.search.repository.ElasticsearchUserRepository;
+import com.iwas.common.storage.StorageService;
 import com.iwas.search.service.ElasticsearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     private final ElasticsearchUserRepository userSearchRepository;
     private final ElasticsearchProjectRepository projectSearchRepository;
     private final SearchProperties properties;
+    private final StorageService storageService;
 
     // -------------------------------------------------------------------------
     // User
@@ -267,7 +269,7 @@ public class ElasticsearchAdapter implements ElasticsearchService {
                 .email(doc.getEmail())
                 .fullName(doc.getFullName())
                 .position(doc.getPosition())
-                .avatarUrl(doc.getAvatarUrl())
+                .avatarUrl(storageService.resolveUrl(doc.getAvatarUrl()))
                 .role(doc.getRole())
                 .build();
     }

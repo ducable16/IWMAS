@@ -49,13 +49,10 @@ public class WorkloadService {
     private final TaskRepository taskRepository;
     private final NotificationService notificationService;
 
-    // ─── constants ────────────────────────────────────────────────────────────
 
     private static final double DEFAULT_DAILY_HOURS = 8.0;
     private static final int DEFAULT_HORIZON_WORKDAYS = 10;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
-
-    // ─── workday math ─────────────────────────────────────────────────────────
 
     private static boolean isWorkday(LocalDate d) {
         DayOfWeek dow = d.getDayOfWeek();

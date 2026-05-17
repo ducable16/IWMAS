@@ -37,6 +37,7 @@ public class TaskCommentService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final UserMapper userMapper;
 
     public List<TaskCommentResponse> getCommentsByTask(Long taskId) {
         ensureTaskExists(taskId);
@@ -145,6 +146,6 @@ public class TaskCommentService {
     }
 
     private UserPublicView toPublicView(User user) {
-        return UserMapper.toPublicView(user);
+        return userMapper.toPublicView(user);
     }
 }
