@@ -24,4 +24,5 @@ public class WorkloadSnapshotResponse {
     private BigDecimal utilizationPercent;
     private WorkloadLevel workloadLevel;
     private Integer overdueTaskCount;
+    private Integer unestimatedTaskCount;
 }

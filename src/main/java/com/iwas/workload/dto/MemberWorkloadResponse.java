@@ -24,6 +24,10 @@ public class MemberWorkloadResponse {
     private WorkloadLevel workloadLevel;
     private Integer activeTaskCount;
     private Integer overdueTaskCount;
+    /** Active tasks of this user with no usable {@code estimatedHours}. They
+     * contribute 0 to the load formula but are surfaced as risk exposure so
+     * PMs can break them down before assigning more work. */
+    private Integer unestimatedTaskCount;
     /** Per-project breakdown — null for endpoints that don't compute it. */
     private List<ProjectAllocationItem> projectAllocations;
     /** null when called from the project-member list; populated for individual user view */
@@ -37,8 +41,13 @@ public class MemberWorkloadResponse {
         private TaskStatus status;
         private TaskPriority priority;
         private LocalDate dueDate;
+        /** Virtual-burn remaining hours. {@code null} when the task has no
+         * usable estimate (see {@link #unestimated}). */
         private BigDecimal remainingHours;
         private boolean overdue;
+        /** {@code true} when the task's estimatedHours is missing or
+         * non-positive — frontend should render a "needs estimate" badge. */
+        private boolean unestimated;
     }
 
     @Getter

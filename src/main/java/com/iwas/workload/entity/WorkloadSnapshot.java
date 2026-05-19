@@ -68,6 +68,9 @@ public class WorkloadSnapshot {
     @Column(name = "overdue_task_count")
     private Integer overdueTaskCount = 0;
 
+    @Column(name = "unestimated_task_count")
+    private Integer unestimatedTaskCount = 0;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

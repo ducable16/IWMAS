@@ -121,17 +121,7 @@ class WorkloadServiceTest {
         LocalDate mon = nextMonday(LocalDate.now().plusWeeks(2));
         LocalDate fri = mon.plusDays(4);
 
-        Task t = new Task();
-        t.setId(1L);
-        t.setProjectId(100L);
-        t.setAssigneeId(1L);
-        t.setStartDate(mon);
-        t.setDueDate(fri);
-        t.setEstimatedHours(BigDecimal.valueOf(10));
-        t.setActualHours(BigDecimal.ZERO);
-        t.setStatus(TaskStatus.TODO);
-        t.setType(TaskType.FEATURE);
-
+        Task t = makeTask(mon, fri, BigDecimal.valueOf(10), BigDecimal.ZERO);
         when(taskRepo.findActiveTasksByAssigneeId(1L)).thenReturn(List.of(t));
 
         ProjectMember full = new ProjectMember();
@@ -153,5 +143,120 @@ class WorkloadServiceTest {
         assertTrue(ratio.subtract(BigDecimal.valueOf(2)).abs()
                         .compareTo(BigDecimal.valueOf(0.01)) < 0,
                 "50% alloc should produce ~2x utilization vs 100%, got " + ratio);
+    }
+
+    @Test
+    void utilizationPerProject_actualHoursDoNotAffectLoad() {
+        // Virtual burn model derives load from schedule alone — actualHours is
+        // reporting-only and must not change utilization.
+        LocalDate mon = nextMonday(LocalDate.now().plusWeeks(2));
+        LocalDate fri = mon.plusDays(4);
+
+        ProjectMember pm = new ProjectMember();
+        pm.setAllocatedEffortPercent(100);
+        when(projectMemberRepo.findActiveMemberByProjectIdAndUserId(100L, 1L))
+                .thenReturn(Optional.of(pm));
+
+        Task zeroLogged = makeTask(mon, fri, BigDecimal.valueOf(10), BigDecimal.ZERO);
+        when(taskRepo.findActiveTasksByAssigneeId(1L)).thenReturn(List.of(zeroLogged));
+        BigDecimal utilNoLog = service.utilizationPerProject(1L, 100L, mon, fri);
+
+        Task heavilyLogged = makeTask(mon, fri, BigDecimal.valueOf(10), BigDecimal.valueOf(8));
+        when(taskRepo.findActiveTasksByAssigneeId(1L)).thenReturn(List.of(heavilyLogged));
+        BigDecimal utilWithLog = service.utilizationPerProject(1L, 100L, mon, fri);
+
+        assertNotNull(utilNoLog);
+        assertNotNull(utilWithLog);
+        assertEquals(0, utilNoLog.compareTo(utilWithLog),
+                "actualHours must not change workload util; got " + utilNoLog + " vs " + utilWithLog);
+    }
+
+    @Test
+    void utilizationPerProject_overdueTaskCollapsesFullEstimatedToToday() {
+        // Overdue task should still surface in workload (bug P2 of v1 model).
+        // Collapse to today with full estimated load.
+        LocalDate today = LocalDate.now();
+        // Build a window that includes today but starts on a Monday to keep workday math stable.
+        LocalDate mon = today.with(DayOfWeek.MONDAY);
+        LocalDate fri = mon.plusDays(4);
+        if (today.isBefore(mon) || today.isAfter(fri)) {
+            // Skip — we'd need a window that always covers today, but on a weekend today won't
+            // be in [mon, fri]. Fall back to next Monday-Friday window (overdue still applies
+            // because dueDate is well in the past).
+            mon = nextMonday(today.plusWeeks(1));
+            fri = mon.plusDays(4);
+        }
+
+        ProjectMember pm = new ProjectMember();
+        pm.setAllocatedEffortPercent(100);
+        when(projectMemberRepo.findActiveMemberByProjectIdAndUserId(100L, 1L))
+                .thenReturn(Optional.of(pm));
+
+        Task overdue = makeTask(today.minusDays(20), today.minusDays(10),
+                BigDecimal.valueOf(6), BigDecimal.ZERO);
+        when(taskRepo.findActiveTasksByAssigneeId(1L)).thenReturn(List.of(overdue));
+
+        BigDecimal util = service.utilizationPerProject(1L, 100L, mon, fri);
+        assertNotNull(util, "overdue task must contribute to util, not return null");
+        assertTrue(util.compareTo(BigDecimal.ZERO) > 0,
+                "overdue task should contribute positive load; got " + util);
+    }
+
+    @Test
+    void utilizationPerProject_nullEstimateContributesZeroLoad() {
+        // v2.1 chốt: task with no usable estimate must NOT be silently filled by
+        // typeDefault — it contributes 0 to load and is surfaced separately via
+        // unestimatedTaskCount (verified in DTO-level tests).
+        LocalDate mon = nextMonday(LocalDate.now().plusWeeks(2));
+        LocalDate fri = mon.plusDays(4);
+
+        ProjectMember pm = new ProjectMember();
+        pm.setAllocatedEffortPercent(100);
+        when(projectMemberRepo.findActiveMemberByProjectIdAndUserId(100L, 1L))
+                .thenReturn(Optional.of(pm));
+
+        Task unestimated = makeTask(mon, fri, null, BigDecimal.ZERO);
+        when(taskRepo.findActiveTasksByAssigneeId(1L)).thenReturn(List.of(unestimated));
+
+        BigDecimal util = service.utilizationPerProject(1L, 100L, mon, fri);
+        assertNotNull(util);
+        assertEquals(0, util.compareTo(BigDecimal.ZERO),
+                "task with null estimate must not contribute to load; got " + util);
+    }
+
+    @Test
+    void utilizationPerProject_zeroOrNegativeEstimateContributesZeroLoad() {
+        // Defensive: estimated = 0 (degenerate data) must behave like null
+        // — task counts toward unestimatedTaskCount, not load.
+        LocalDate mon = nextMonday(LocalDate.now().plusWeeks(2));
+        LocalDate fri = mon.plusDays(4);
+
+        ProjectMember pm = new ProjectMember();
+        pm.setAllocatedEffortPercent(100);
+        when(projectMemberRepo.findActiveMemberByProjectIdAndUserId(100L, 1L))
+                .thenReturn(Optional.of(pm));
+
+        Task zeroEst = makeTask(mon, fri, BigDecimal.ZERO, BigDecimal.ZERO);
+        when(taskRepo.findActiveTasksByAssigneeId(1L)).thenReturn(List.of(zeroEst));
+
+        BigDecimal util = service.utilizationPerProject(1L, 100L, mon, fri);
+        assertNotNull(util);
+        assertEquals(0, util.compareTo(BigDecimal.ZERO),
+                "task with zero estimate must not contribute to load; got " + util);
+    }
+
+    private Task makeTask(LocalDate start, LocalDate due,
+                          BigDecimal estimated, BigDecimal actual) {
+        Task t = new Task();
+        t.setId(1L);
+        t.setProjectId(100L);
+        t.setAssigneeId(1L);
+        t.setStartDate(start);
+        t.setDueDate(due);
+        t.setEstimatedHours(estimated);
+        t.setActualHours(actual);
+        t.setStatus(TaskStatus.TODO);
+        t.setType(TaskType.FEATURE);
+        return t;
     }
 }

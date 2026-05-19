@@ -10,7 +10,6 @@ import com.iwas.project.entity.ProjectMember;
 import com.iwas.project.repository.ProjectMemberRepository;
 import com.iwas.project.repository.ProjectRepository;
 import com.iwas.task.entity.Task;
-import com.iwas.task.enums.TaskType;
 import com.iwas.task.repository.TaskRepository;
 import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
@@ -85,76 +84,102 @@ public class WorkloadService {
         return countWorkdays(ovStart, ovEnd);
     }
 
-    // ─── task-level: remaining + daily rate ───────────────────────────────────
+    // ─── task-level: virtual burn ─────────────────────────────────────────────
 
-    private static BigDecimal typeDefaultHours(TaskType type) {
-        if (type == null) return BigDecimal.valueOf(1.5);
-        return switch (type) {
-            case BUG -> BigDecimal.valueOf(2.0);
-            case FEATURE -> BigDecimal.valueOf(4.0);
-            default -> BigDecimal.valueOf(1.5);
-        };
-    }
-
-    private BigDecimal remainingHours(Task task) {
-        BigDecimal estimated = task.getEstimatedHours() != null
-                ? task.getEstimatedHours()
-                : typeDefaultHours(task.getType());
-        BigDecimal actual = task.getActualHours() != null ? task.getActualHours() : BigDecimal.ZERO;
-        return estimated.subtract(actual).max(BigDecimal.ZERO);
-    }
-
-    private record DailyRate(LocalDate effStart, LocalDate effEnd, BigDecimal hoursPerDay) {}
+    private record TaskBurn(LocalDate effStart, LocalDate effEnd,
+                            BigDecimal dailyBurn, BigDecimal remaining) {}
 
     /**
-     * Linear-spread daily rate.
-     * - Overdue tasks collapse onto today.
-     * - Tasks with no dueDate are spread over DEFAULT_HORIZON_WORKDAYS.
-     * Returns null when the task has zero remaining hours.
+     * Virtual-burn schedule for a task.
+     *
+     * After TaskService.resolveAndApplyDates() runs at the API boundary,
+     * startDate and dueDate are guaranteed non-null on new/updated tasks. The
+     * null fallbacks below are defensive for legacy rows that pre-date the
+     * validation.
+     *
+     * Formula:
+     *  - Overdue (due < today): collapse to today, full estimated as load today.
+     *  - Normal: dailyBurn = estimated / span(start, due) — fixed at scheduling.
+     *            remaining = max(0, estimated − dailyBurn × elapsed workdays).
+     *
+     * Returns null in three cases (caller must skip the task):
+     *  - estimatedHours is null or non-positive (task is unestimated — counted
+     *    separately as `unestimatedTaskCount` so PMs see the risk explicitly
+     *    rather than via a silent type-based default).
+     *  - virtual burn has consumed the full estimate (task is "burned out").
+     *  - both startDate and dueDate are null (legacy data, defensive).
+     *
+     * actualHours is intentionally NOT consulted here. Time logs are a
+     * reporting record (snapshot.totalActualHours, capacityUsedPercent); the
+     * workload model derives load from schedule alone so it stays robust
+     * against teams with inconsistent log-time discipline.
      */
-    private DailyRate dailyRateOf(Task t, LocalDate today) {
-        BigDecimal remaining = remainingHours(t);
-        if (remaining.signum() <= 0) return null;
+    private TaskBurn computeBurn(Task task, LocalDate today) {
+        BigDecimal estimated = task.getEstimatedHours();
+        if (estimated == null || estimated.signum() <= 0) return null;
 
-        LocalDate due = t.getDueDate();
-        LocalDate start = t.getStartDate();
-        LocalDate effStart, effEnd;
+        LocalDate start = task.getStartDate();
+        LocalDate due = task.getDueDate();
+        if (start == null && due == null) return null;
+        if (start == null) start = today;
+        if (due == null) due = addWorkdays(start, DEFAULT_HORIZON_WORKDAYS - 1);
 
-        if (due != null && due.isBefore(today)) {
-            effStart = today;
-            effEnd = today;
-        } else if (due != null) {
-            effStart = (start != null && start.isAfter(today)) ? start : today;
-            effEnd = due;
-            if (effEnd.isBefore(effStart)) effEnd = effStart;
-        } else {
-            effStart = (start != null && start.isAfter(today)) ? start : today;
-            effEnd = addWorkdays(effStart, DEFAULT_HORIZON_WORKDAYS - 1);
+        if (due.isBefore(today)) {
+            return new TaskBurn(today, today, estimated, estimated);
         }
 
-        long workdays = countWorkdays(effStart, effEnd);
-        if (workdays <= 0) workdays = 1;
-        BigDecimal rate = remaining.divide(BigDecimal.valueOf(workdays), 4, RoundingMode.HALF_UP);
-        return new DailyRate(effStart, effEnd, rate);
+        LocalDate effStart = start.isAfter(today) ? start : today;
+        LocalDate effEnd = due.isBefore(effStart) ? effStart : due;
+
+        long span = countWorkdays(start, due);
+        if (span <= 0) span = 1;
+        BigDecimal dailyBurn = estimated.divide(BigDecimal.valueOf(span), 4, RoundingMode.HALF_UP);
+
+        long elapsed = 0;
+        if (today.isAfter(start)) {
+            elapsed = Math.min(span, countWorkdays(start, today.minusDays(1)));
+        }
+        BigDecimal remaining = estimated
+                .subtract(dailyBurn.multiply(BigDecimal.valueOf(elapsed)))
+                .max(BigDecimal.ZERO);
+        if (remaining.signum() <= 0) return null;
+
+        return new TaskBurn(effStart, effEnd, dailyBurn, remaining);
     }
 
     private BigDecimal loadInWindow(List<Task> tasks, LocalDate from, LocalDate to, LocalDate today) {
         BigDecimal sum = BigDecimal.ZERO;
-        for (Task t : tasks) {
-            DailyRate dr = dailyRateOf(t, today);
-            if (dr == null) continue;
-            long ov = overlapWorkdays(from, to, dr.effStart(), dr.effEnd());
+        for (Task task : tasks) {
+            TaskBurn tb = computeBurn(task, today);
+            if (tb == null) continue;
+            long ov = overlapWorkdays(from, to, tb.effStart(), tb.effEnd());
             if (ov > 0) {
-                sum = sum.add(dr.hoursPerDay().multiply(BigDecimal.valueOf(ov)));
+                sum = sum.add(tb.dailyBurn().multiply(BigDecimal.valueOf(ov)));
             }
         }
         return sum.setScale(1, RoundingMode.HALF_UP);
     }
 
-    private boolean taskTouchesWindow(Task t, LocalDate from, LocalDate to, LocalDate today) {
-        DailyRate dr = dailyRateOf(t, today);
-        if (dr == null) return false;
-        return overlapWorkdays(from, to, dr.effStart(), dr.effEnd()) > 0;
+    private boolean taskTouchesWindow(Task task, LocalDate from, LocalDate to, LocalDate today) {
+        TaskBurn tb = computeBurn(task, today);
+        if (tb != null) {
+            return overlapWorkdays(from, to, tb.effStart(), tb.effEnd()) > 0;
+        }
+        // Unestimated tasks bypass virtual burn but should still surface in the
+        // touching list so PMs can act on them — fall back to raw date overlap.
+        if (!isUnestimated(task)) return false;
+        LocalDate start = task.getStartDate();
+        LocalDate due = task.getDueDate();
+        if (start == null && due == null) return false;
+        if (start == null) start = today;
+        if (due == null) due = addWorkdays(start, DEFAULT_HORIZON_WORKDAYS - 1);
+        if (due.isBefore(today)) return overlapWorkdays(from, to, today, today) > 0;
+        LocalDate effStart = start.isAfter(today) ? start : today;
+        return overlapWorkdays(from, to, effStart, due) > 0;
+    }
+
+    private static boolean isUnestimated(Task task) {
+        return task.getEstimatedHours() == null || task.getEstimatedHours().signum() <= 0;
     }
 
     private static WorkloadLevel toWorkloadLevel(BigDecimal utilizationPercent) {
@@ -172,6 +197,7 @@ public class WorkloadService {
             WorkloadLevel workloadLevel,
             int activeTaskCount,
             int overdueTaskCount,
+            int unestimatedTaskCount,
             List<Task> tasksTouchingWindow
     ) {}
 
@@ -198,12 +224,16 @@ public class WorkloadService {
                 .filter(t -> t.getDueDate() != null && t.getDueDate().isBefore(today))
                 .count();
 
+        int unestimatedCount = (int) activeTasks.stream()
+                .filter(WorkloadService::isUnestimated)
+                .count();
+
         List<Task> touching = activeTasks.stream()
                 .filter(t -> taskTouchesWindow(t, from, to, today))
                 .toList();
 
         return new TotalUtilization(capacity, load, utilization, level,
-                activeTasks.size(), overdueCount, touching);
+                activeTasks.size(), overdueCount, unestimatedCount, touching);
     }
 
     // ─── per-project utilization ──────────────────────────────────────────────
@@ -371,6 +401,7 @@ public class WorkloadService {
         snapshot.setUtilizationPercent(total.utilizationPercent());
         snapshot.setWorkloadLevel(total.workloadLevel());
         snapshot.setOverdueTaskCount(total.overdueTaskCount());
+        snapshot.setUnestimatedTaskCount(total.unestimatedTaskCount());
 
         WorkloadSnapshot saved = workloadSnapshotRepository.save(snapshot);
 
@@ -483,6 +514,7 @@ public class WorkloadService {
                 .workloadLevel(total.workloadLevel())
                 .activeTaskCount(total.activeTaskCount())
                 .overdueTaskCount(total.overdueTaskCount())
+                .unestimatedTaskCount(total.unestimatedTaskCount())
                 .projectAllocations(projectItems)
                 .tasks(taskItems)
                 .build();
@@ -490,14 +522,19 @@ public class WorkloadService {
 
     private MemberWorkloadResponse.TaskWorkloadItem toTaskItem(Task task, LocalDate today) {
         boolean overdue = task.getDueDate() != null && task.getDueDate().isBefore(today);
+        TaskBurn tb = computeBurn(task, today);
+        BigDecimal remaining = tb != null
+                ? tb.remaining().setScale(2, RoundingMode.HALF_UP)
+                : null;
         return MemberWorkloadResponse.TaskWorkloadItem.builder()
                 .taskId(task.getId())
                 .title(task.getTitle())
                 .status(task.getStatus())
                 .priority(task.getPriority())
                 .dueDate(task.getDueDate())
-                .remainingHours(remainingHours(task))
+                .remainingHours(remaining)
                 .overdue(overdue)
+                .unestimated(isUnestimated(task))
                 .build();
     }
 
@@ -539,6 +576,7 @@ public class WorkloadService {
                 .utilizationPercent(ws.getUtilizationPercent())
                 .workloadLevel(ws.getWorkloadLevel())
                 .overdueTaskCount(ws.getOverdueTaskCount())
+                .unestimatedTaskCount(ws.getUnestimatedTaskCount())
                 .build();
     }
 

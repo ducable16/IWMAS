@@ -67,6 +67,7 @@ public enum ErrorCode {
     TASK_COMMENT_NOT_FOUND(5003, "Task comment not found", HttpStatus.NOT_FOUND),
     TASK_ASSIGNEE_NOT_PROJECT_MEMBER(5004, "Assignee is not a member of this project", HttpStatus.BAD_REQUEST),
     TASK_INVALID_DATE_RANGE(5005, "Start date must not be after due date", HttpStatus.BAD_REQUEST),
+    TASK_DATES_REQUIRED(5006, "At least one of start date or due date is required", HttpStatus.BAD_REQUEST),
 
     // --- 6xxx: Time Logs ---
     TIME_LOG_NOT_FOUND(6001, "Time log not found", HttpStatus.NOT_FOUND),

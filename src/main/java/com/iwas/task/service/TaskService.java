@@ -34,6 +34,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -280,14 +282,7 @@ public class TaskService {
         Task task = findTask(id);
         requireTaskEditAccess(task);
 
-        LocalDate start = request.getStartDate();
-        LocalDate due = request.getDueDate();
-        if (start != null && due != null && start.isAfter(due)) {
-            throw new AppException(ErrorCode.TASK_INVALID_DATE_RANGE);
-        }
-
-        task.setStartDate(start);
-        task.setDueDate(due);
+        resolveAndApplyDates(task, request.getStartDate(), request.getDueDate());
         task = taskRepository.save(task);
         return toResponse(task, getSkillRequirements(task.getId()));
     }
@@ -393,12 +388,67 @@ public class TaskService {
         task.setType(request.getType());
         task.setPriority(request.getPriority());
         task.setEstimatedHours(request.getEstimatedHours());
-        task.setStartDate(request.getStartDate());
-        task.setDueDate(request.getDueDate());
         task.setAssigneeId(request.getAssigneeId());
         task.setSprint(request.getSprint());
         task.setLabels(request.getLabels() != null ? request.getLabels() : new HashSet<>());
         task.setCustomFields(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
+        resolveAndApplyDates(task, request.getStartDate(), request.getDueDate());
+    }
+
+    private static final int DEFAULT_HORIZON_WORKDAYS = 10;
+
+    /**
+     * Date resolution rules for workload model v2.1:
+     *  - Both null              → reject (TASK_DATES_REQUIRED).
+     *  - Only dueDate set       → default startDate = today (deadline-driven, rate fits span).
+     *  - Only startDate set:
+     *      • with estimate      → default dueDate = startDate + ceil(estimated) workdays − 1
+     *                             (drip ~1h/day for open-ended tasks).
+     *      • estimate null      → default dueDate = startDate + DEFAULT_HORIZON_WORKDAYS − 1
+     *                             (placeholder; task contributes 0 to load until estimate is set
+     *                             — counted as unestimatedTaskCount instead).
+     *  - Both set               → validate start <= due, store as-is.
+     */
+    private void resolveAndApplyDates(Task task, LocalDate requestedStart, LocalDate requestedDue) {
+        if (requestedStart == null && requestedDue == null) {
+            throw new AppException(ErrorCode.TASK_DATES_REQUIRED);
+        }
+
+        LocalDate start = requestedStart != null ? requestedStart : LocalDate.now();
+        LocalDate due = requestedDue;
+        if (due == null) {
+            int wd;
+            BigDecimal estimated = task.getEstimatedHours();
+            if (estimated != null && estimated.signum() > 0) {
+                wd = Math.max(1, (int) Math.ceil(estimated.doubleValue()));
+            } else {
+                wd = DEFAULT_HORIZON_WORKDAYS;
+            }
+            due = addWorkdays(start, wd - 1);
+        }
+
+        if (start.isAfter(due)) {
+            throw new AppException(ErrorCode.TASK_INVALID_DATE_RANGE);
+        }
+
+        task.setStartDate(start);
+        task.setDueDate(due);
+    }
+
+    private static boolean isWorkday(LocalDate d) {
+        DayOfWeek dow = d.getDayOfWeek();
+        return dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
+    }
+
+    private static LocalDate addWorkdays(LocalDate start, int workdaysToAdd) {
+        if (workdaysToAdd <= 0) return start;
+        LocalDate d = start;
+        int added = 0;
+        while (added < workdaysToAdd) {
+            d = d.plusDays(1);
+            if (isWorkday(d)) added++;
+        }
+        return d;
     }
 
     private Task findTask(Long id) {
