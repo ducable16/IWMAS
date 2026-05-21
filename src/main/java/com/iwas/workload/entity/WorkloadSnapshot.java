@@ -55,8 +55,9 @@ public class WorkloadSnapshot {
     @Column(name = "weekly_capacity_hours", precision = 6, scale = 1)
     private BigDecimal weeklyCapacityHours;
 
-    @Column(name = "weekly_remaining_hours", precision = 6, scale = 1)
-    private BigDecimal weeklyRemainingHours;
+    /** Integrated virtual-burn load over the snapshot week — NOT spare time. */
+    @Column(name = "weekly_load_hours", precision = 6, scale = 1)
+    private BigDecimal weeklyLoadHours;
 
     @Column(name = "utilization_percent", precision = 5, scale = 2)
     private BigDecimal utilizationPercent;

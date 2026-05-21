@@ -45,7 +45,6 @@ public class TaskController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        // Remove known params from customFields map so only actual custom fields remain
         Set<String> knownParams = Set.of("search", "projectId", "statuses", "assigneeId", "reporterId",
                 "priorities", "types", "labels", "sprint", "dueDateFrom", "dueDateTo",
                 "sortBy", "sortDirection", "page", "size");

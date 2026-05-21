@@ -19,7 +19,7 @@ public class MemberWorkloadResponse {
     private LocalDate weekStart;
     private LocalDate weekEnd;
     private BigDecimal weeklyCapacityHours;
-    private BigDecimal weeklyRemainingHours;
+    private BigDecimal weeklyLoadHours;
     private BigDecimal utilizationPercent;
     private WorkloadLevel workloadLevel;
     private Integer activeTaskCount;

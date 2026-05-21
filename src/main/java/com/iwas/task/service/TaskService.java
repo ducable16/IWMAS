@@ -574,6 +574,7 @@ public class TaskService {
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())
+                .sprint(t.getSprint())
                 .labels(t.getLabels())
                 .customFields(t.getCustomFields())
                 .assignee(userMapper.toPublicView(assignee))

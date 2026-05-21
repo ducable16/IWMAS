@@ -20,7 +20,7 @@ public class WorkloadSnapshotResponse {
     private Integer projectCount;
     private Integer activeTaskCount;
     private BigDecimal weeklyCapacityHours;
-    private BigDecimal weeklyRemainingHours;
+    private BigDecimal weeklyLoadHours;
     private BigDecimal utilizationPercent;
     private WorkloadLevel workloadLevel;
     private Integer overdueTaskCount;

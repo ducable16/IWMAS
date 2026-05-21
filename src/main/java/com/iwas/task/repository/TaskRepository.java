@@ -21,6 +21,9 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
     @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.assigneeId = :assigneeId AND t.status NOT IN ('DONE', 'CANCELLED')")
     List<Task> findActiveTasksByAssigneeId(Long assigneeId);
 
+    @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.projectId = :projectId AND t.assigneeId = :assigneeId AND t.status NOT IN ('DONE', 'CANCELLED')")
+    List<Task> findActiveTasksByProjectIdAndAssigneeId(@Param("projectId") Long projectId, @Param("assigneeId") Long assigneeId);
+
     @Query("SELECT t FROM Task t WHERE t.isDeleted = false AND t.projectId = :projectId AND t.status = :status")
     List<Task> findByProjectIdAndStatus(Long projectId, TaskStatus status);
 

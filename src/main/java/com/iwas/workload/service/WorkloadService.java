@@ -397,7 +397,7 @@ public class WorkloadService {
         snapshot.setProjectCount(projectCount);
         snapshot.setActiveTaskCount(total.activeTaskCount());
         snapshot.setWeeklyCapacityHours(total.capacityHours());
-        snapshot.setWeeklyRemainingHours(total.loadHours());
+        snapshot.setWeeklyLoadHours(total.loadHours());
         snapshot.setUtilizationPercent(total.utilizationPercent());
         snapshot.setWorkloadLevel(total.workloadLevel());
         snapshot.setOverdueTaskCount(total.overdueTaskCount());
@@ -509,7 +509,7 @@ public class WorkloadService {
                 .weekStart(weekStart)
                 .weekEnd(weekEnd)
                 .weeklyCapacityHours(total.capacityHours())
-                .weeklyRemainingHours(total.loadHours())
+                .weeklyLoadHours(total.loadHours())
                 .utilizationPercent(total.utilizationPercent())
                 .workloadLevel(total.workloadLevel())
                 .activeTaskCount(total.activeTaskCount())
@@ -572,7 +572,7 @@ public class WorkloadService {
                 .projectCount(ws.getProjectCount())
                 .activeTaskCount(ws.getActiveTaskCount())
                 .weeklyCapacityHours(ws.getWeeklyCapacityHours())
-                .weeklyRemainingHours(ws.getWeeklyRemainingHours())
+                .weeklyLoadHours(ws.getWeeklyLoadHours())
                 .utilizationPercent(ws.getUtilizationPercent())
                 .workloadLevel(ws.getWorkloadLevel())
                 .overdueTaskCount(ws.getOverdueTaskCount())

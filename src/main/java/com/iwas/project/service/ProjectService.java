@@ -9,6 +9,8 @@ import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.dto.*;
 import com.iwas.project.entity.Project;
+import com.iwas.project.enums.ProjectRoleInProject;
+import com.iwas.task.repository.TaskRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.iwas.project.entity.ProjectMember;
 import com.iwas.project.enums.ProjectStatus;
@@ -52,6 +54,7 @@ public class ProjectService {
     private final NotificationService notificationService;
     private final ProjectCodeService projectCodeService;
     private final UserMapper userMapper;
+    private final TaskRepository taskRepository;
 
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
         String role = authenticatedUserResolver.currentUserRole();
@@ -188,6 +191,13 @@ public class ProjectService {
         project.setEndDate(request.getEndDate());
         project.setManagerId(request.getManagerId());
         Project saved = projectRepository.save(project);
+
+        ProjectMemberRequest member = new ProjectMemberRequest();
+        member.setUserId(request.getManagerId());
+        member.setRoleInProject(ProjectRoleInProject.LEAD);
+        member.setAllocatedEffortPercent(0);
+        addMember(saved.getId(), member);
+
         projectIndexEventPublisher.publish(toUpsertEvent(saved));
         return toProjectResponse(saved);
     }
@@ -251,7 +261,7 @@ public class ProjectService {
         member.setUserId(request.getUserId());
         member.setRoleInProject(request.getRoleInProject());
         member.setAllocatedEffortPercent(request.getAllocatedEffortPercent());
-        member.setJoinDate(request.getJoinDate());
+        member.setJoinDate(request.getJoinDate() != null ? request.getJoinDate() : LocalDate.now());
         member.setNote(request.getNote());
 
         String userName = userRepository.findById(request.getUserId())
@@ -315,6 +325,15 @@ public class ProjectService {
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_MEMBER_NOT_FOUND));
         member.setIsDeleted(true);
         projectMemberRepository.save(member);
+
+        Project project = findProject(projectId);
+        List<com.iwas.task.entity.Task> tasks =
+                taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, member.getUserId());
+        if (!tasks.isEmpty()) {
+            Long pmId = project.getManagerId();
+            tasks.forEach(t -> t.setAssigneeId(pmId));
+            taskRepository.saveAll(tasks);
+        }
     }
 
     // --- Search index helpers ---
