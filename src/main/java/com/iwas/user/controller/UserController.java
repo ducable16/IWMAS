@@ -2,6 +2,7 @@ package com.iwas.user.controller;
 
 import com.iwas.auth.dto.ChangePasswordRequest;
 import com.iwas.auth.dto.UpdateProfileRequest;
+import com.iwas.user.dto.AdminResetPasswordRequest;
 import com.iwas.project.dto.ProjectFilterRequest;
 import com.iwas.project.dto.ProjectPageResponse;
 import com.iwas.project.service.ProjectService;
@@ -77,6 +78,13 @@ public class UserController {
     public Object getUserById(@PathVariable Long id) {
         UserRole callerRole = UserRole.valueOf(authenticatedUserResolver.currentUserRole());
         return userService.getUserById(id, callerRole);
+    }
+
+    @PatchMapping("/{id}/password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String adminResetPassword(@PathVariable Long id,
+                                     @Valid @RequestBody AdminResetPasswordRequest request) {
+        return userService.adminResetPassword(id, request);
     }
 
     @PatchMapping("/{id}/activate")

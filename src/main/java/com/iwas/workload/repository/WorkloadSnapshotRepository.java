@@ -15,6 +15,6 @@ public interface WorkloadSnapshotRepository extends JpaRepository<WorkloadSnapsh
     @Query("SELECT ws FROM WorkloadSnapshot ws WHERE ws.userId = :userId ORDER BY ws.snapshotDate DESC")
     List<WorkloadSnapshot> findByUserIdOrderByDateDesc(Long userId);
 
-    @Query("SELECT ws FROM WorkloadSnapshot ws WHERE ws.snapshotDate = :date ORDER BY ws.capacityUsedPercent DESC")
+    @Query("SELECT ws FROM WorkloadSnapshot ws WHERE ws.snapshotDate = :date ORDER BY ws.overallPercent DESC")
     List<WorkloadSnapshot> findBySnapshotDate(LocalDate date);
 }

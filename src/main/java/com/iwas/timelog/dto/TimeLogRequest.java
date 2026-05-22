@@ -22,5 +22,14 @@ public class TimeLogRequest {
     @DecimalMax(value = "24.0", message = "Hours cannot exceed 24")
     private BigDecimal hoursSpent;
 
+    /**
+     * Optional member-reported remaining effort on the task as of logDate.
+     * When present it is snapshotted onto the task and feeds the workload
+     * schedule simulation. Use 0 to signal the task is finished.
+     */
+    @DecimalMin(value = "0.0", message = "Remaining hours cannot be negative")
+    @DecimalMax(value = "9999.9", message = "Remaining hours is too large")
+    private BigDecimal remainingHours;
+
     private String description;
 }

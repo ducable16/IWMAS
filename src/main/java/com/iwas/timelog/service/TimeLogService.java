@@ -52,6 +52,7 @@ public class TimeLogService {
         timeLog.setUserId(userId);
         timeLog.setLogDate(request.getLogDate());
         timeLog.setHoursSpent(request.getHoursSpent());
+        timeLog.setRemainingHours(request.getRemainingHours());
         timeLog.setDescription(request.getDescription());
         TimeLog saved = timeLogRepository.save(timeLog);
 
@@ -59,8 +60,9 @@ public class TimeLogService {
         Double totalHours = timeLogRepository.sumHoursByTaskId(task.getId());
         if (totalHours != null) {
             task.setActualHours(BigDecimal.valueOf(totalHours));
-            taskRepository.save(task);
         }
+        applyRemainingToTask(task, request.getLogDate(), request.getRemainingHours());
+        taskRepository.save(task);
 
         return toResponse(saved);
     }
@@ -72,6 +74,7 @@ public class TimeLogService {
                 .orElseThrow(() -> new AppException(ErrorCode.TIME_LOG_NOT_FOUND));
 
         timeLog.setHoursSpent(request.getHoursSpent());
+        timeLog.setRemainingHours(request.getRemainingHours());
         timeLog.setDescription(request.getDescription());
         TimeLog saved = timeLogRepository.save(timeLog);
 
@@ -79,6 +82,7 @@ public class TimeLogService {
         Double totalHours = timeLogRepository.sumHoursByTaskId(timeLog.getTaskId());
         taskRepository.findById(timeLog.getTaskId()).ifPresent(task -> {
             task.setActualHours(totalHours != null ? BigDecimal.valueOf(totalHours) : BigDecimal.ZERO);
+            applyRemainingToTask(task, timeLog.getLogDate(), request.getRemainingHours());
             taskRepository.save(task);
         });
 
@@ -94,6 +98,20 @@ public class TimeLogService {
         timeLogRepository.save(timeLog);
     }
 
+    /**
+     * Snapshots the member-reported remaining effort onto the task. Keyed by
+     * logDate, not insertion time: a later log wins, so back-dated logs (member
+     * forgot last night, logs this morning) never overwrite a fresher report.
+     */
+    private void applyRemainingToTask(Task task, LocalDate logDate, BigDecimal remainingHours) {
+        if (remainingHours == null) return;
+        LocalDate current = task.getRemainingReportedDate();
+        if (current == null || !logDate.isBefore(current)) {
+            task.setReportedRemainingHours(remainingHours);
+            task.setRemainingReportedDate(logDate);
+        }
+    }
+
     private TimeLogResponse toResponse(TimeLog tl) {
         String taskTitle = taskRepository.findById(tl.getTaskId())
                 .map(Task::getTitle).orElse(null);
@@ -104,6 +122,7 @@ public class TimeLogService {
                 .userId(tl.getUserId())
                 .logDate(tl.getLogDate())
                 .hoursSpent(tl.getHoursSpent())
+                .remainingHours(tl.getRemainingHours())
                 .description(tl.getDescription())
                 .createdAt(tl.getCreatedAt())
                 .build();

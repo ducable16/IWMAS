@@ -16,6 +16,7 @@ public class TimeLogResponse {
     private Long userId;
     private LocalDate logDate;
     private BigDecimal hoursSpent;
+    private BigDecimal remainingHours;
     private String description;
     private LocalDateTime createdAt;
 }

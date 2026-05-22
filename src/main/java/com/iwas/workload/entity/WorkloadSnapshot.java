@@ -11,6 +11,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Daily snapshot of a member's workload under the v3 schedule-simulation model.
+ */
 @Getter
 @Setter
 @Entity
@@ -37,40 +40,32 @@ public class WorkloadSnapshot {
     @Column(name = "snapshot_date", nullable = false)
     private LocalDate snapshotDate;
 
-    @Column(name = "total_allocated_hours", precision = 6, scale = 1)
-    private BigDecimal totalAllocatedHours;
-
-    @Column(name = "total_actual_hours", precision = 6, scale = 1)
-    private BigDecimal totalActualHours;
-
-    @Column(name = "capacity_used_percent", precision = 5, scale = 2)
-    private BigDecimal capacityUsedPercent;
-
     @Column(name = "project_count")
     private Integer projectCount = 0;
 
     @Column(name = "active_task_count")
     private Integer activeTaskCount = 0;
 
-    @Column(name = "weekly_capacity_hours", precision = 6, scale = 1)
-    private BigDecimal weeklyCapacityHours;
+    @Column(name = "overdue_task_count")
+    private Integer overdueTaskCount = 0;
 
-    /** Integrated virtual-burn load over the snapshot week — NOT spare time. */
-    @Column(name = "weekly_load_hours", precision = 6, scale = 1)
-    private BigDecimal weeklyLoadHours;
+    @Column(name = "predicted_late_task_count")
+    private Integer predictedLateTaskCount = 0;
 
-    @Column(name = "utilization_percent", precision = 5, scale = 2)
-    private BigDecimal utilizationPercent;
+    @Column(name = "unestimated_task_count")
+    private Integer unestimatedTaskCount = 0;
+
+    /** Worst near-term tightness across the member's project lanes (percent). */
+    @Column(name = "near_term_percent", precision = 7, scale = 2)
+    private BigDecimal nearTermPercent;
+
+    /** Worst overall-feasibility tightness across the member's project lanes (percent). */
+    @Column(name = "overall_percent", precision = 7, scale = 2)
+    private BigDecimal overallPercent;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "workload_level", length = 20)
     private WorkloadLevel workloadLevel;
-
-    @Column(name = "overdue_task_count")
-    private Integer overdueTaskCount = 0;
-
-    @Column(name = "unestimated_task_count")
-    private Integer unestimatedTaskCount = 0;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

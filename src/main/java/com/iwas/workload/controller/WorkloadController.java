@@ -3,8 +3,11 @@ package com.iwas.workload.controller;
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.workload.dto.BurnoutLogResponse;
 import com.iwas.workload.dto.MemberWorkloadResponse;
+import com.iwas.workload.dto.ProjectScheduleResponse;
+import com.iwas.workload.dto.SchedulePreviewRequest;
 import com.iwas.workload.dto.WorkloadSnapshotResponse;
 import com.iwas.workload.service.WorkloadService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -48,28 +51,43 @@ public class WorkloadController {
 
     @GetMapping("/projects/{projectId}/members")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
-    public List<MemberWorkloadResponse> getProjectMembersWorkload(
-            @PathVariable Long projectId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd) {
-        return workloadService.getProjectMembersWorkload(projectId, weekStart, weekEnd);
+    public List<MemberWorkloadResponse> getProjectMembersWorkload(@PathVariable Long projectId) {
+        return workloadService.getProjectMembersWorkload(projectId);
     }
 
     @GetMapping("/users/{userId}/realtime")
     @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
-    public MemberWorkloadResponse getUserWorkloadRealtime(
-            @PathVariable Long userId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd) {
-        return workloadService.getUserWorkloadRealtime(userId, weekStart, weekEnd);
+    public MemberWorkloadResponse getUserWorkloadRealtime(@PathVariable Long userId) {
+        return workloadService.getUserWorkloadRealtime(userId);
     }
 
     @GetMapping("/me/realtime")
-    public MemberWorkloadResponse getMyWorkloadRealtime(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekEnd) {
-        return workloadService.getUserWorkloadRealtime(
-                authenticatedUserResolver.currentUserId(), weekStart, weekEnd);
+    public MemberWorkloadResponse getMyWorkloadRealtime() {
+        return workloadService.getUserWorkloadRealtime(authenticatedUserResolver.currentUserId());
+    }
+
+    // ─── what-if scheduling for the current member ────────────────────────────
+
+    @GetMapping("/me/schedule")
+    public ProjectScheduleResponse getMySchedule(@RequestParam Long projectId) {
+        return workloadService.getMySchedule(authenticatedUserResolver.currentUserId(), projectId);
+    }
+
+    @GetMapping("/me/schedule/suggest")
+    public ProjectScheduleResponse suggestMySchedule(@RequestParam Long projectId) {
+        return workloadService.suggestSchedule(authenticatedUserResolver.currentUserId(), projectId);
+    }
+
+    @PostMapping("/me/schedule/preview")
+    public ProjectScheduleResponse previewMySchedule(@Valid @RequestBody SchedulePreviewRequest request) {
+        return workloadService.previewSchedule(authenticatedUserResolver.currentUserId(),
+                request.getProjectId(), request.getOrderedTaskIds());
+    }
+
+    @PutMapping("/me/schedule")
+    public ProjectScheduleResponse saveMySchedule(@Valid @RequestBody SchedulePreviewRequest request) {
+        return workloadService.saveSchedule(authenticatedUserResolver.currentUserId(),
+                request.getProjectId(), request.getOrderedTaskIds());
     }
 
     @GetMapping("/burnout")

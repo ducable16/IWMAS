@@ -14,15 +14,12 @@ public class WorkloadSnapshotResponse {
     private Long userId;
     private String userFullName;
     private LocalDate snapshotDate;
-    private BigDecimal totalAllocatedHours;
-    private BigDecimal totalActualHours;
-    private BigDecimal capacityUsedPercent;
     private Integer projectCount;
     private Integer activeTaskCount;
-    private BigDecimal weeklyCapacityHours;
-    private BigDecimal weeklyLoadHours;
-    private BigDecimal utilizationPercent;
-    private WorkloadLevel workloadLevel;
     private Integer overdueTaskCount;
+    private Integer predictedLateTaskCount;
     private Integer unestimatedTaskCount;
+    private BigDecimal nearTermPercent;
+    private BigDecimal overallPercent;
+    private WorkloadLevel workloadLevel;
 }

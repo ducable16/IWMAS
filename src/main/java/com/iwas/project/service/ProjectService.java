@@ -191,13 +191,6 @@ public class ProjectService {
         project.setEndDate(request.getEndDate());
         project.setManagerId(request.getManagerId());
         Project saved = projectRepository.save(project);
-
-        ProjectMemberRequest member = new ProjectMemberRequest();
-        member.setUserId(request.getManagerId());
-        member.setRoleInProject(ProjectRoleInProject.LEAD);
-        member.setAllocatedEffortPercent(0);
-        addMember(saved.getId(), member);
-
         projectIndexEventPublisher.publish(toUpsertEvent(saved));
         return toProjectResponse(saved);
     }
@@ -300,10 +293,9 @@ public class ProjectService {
      * the surrounding @Transactional boundary.
      */
     private void checkAllocationLimit(Long userId, Integer newAllocation, Long excludeMemberId) {
-        if (newAllocation == null) {
+        if (newAllocation == null || newAllocation <= 0) {
             throw new AppException(ErrorCode.PROJECT_MEMBER_ALLOC_REQUIRED);
         }
-        if (newAllocation == 0) return;
 
         userRepository.findByIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));

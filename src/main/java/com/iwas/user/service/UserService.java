@@ -7,6 +7,7 @@ import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
 import com.iwas.common.storage.FileValidator;
 import com.iwas.common.storage.StorageService;
+import com.iwas.user.dto.AdminResetPasswordRequest;
 import com.iwas.user.dto.CreateUserRequest;
 import com.iwas.user.dto.UpdateUserRequest;
 import com.iwas.user.dto.UserFilterRequest;
@@ -62,6 +63,14 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
         return "Password changed";
+    }
+
+    @Transactional
+    public String adminResetPassword(Long targetUserId, AdminResetPasswordRequest request) {
+        User user = findUser(targetUserId);
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        return "Password reset successfully";
     }
 
     @Transactional

@@ -36,6 +36,14 @@ public class TimeLog extends BaseEntity {
     @Column(name = "hours_spent", nullable = false, precision = 4, scale = 1)
     private BigDecimal hoursSpent;
 
+    /**
+     * Member-reported remaining effort on the task as of {@code logDate}.
+     * Optional — when present it is snapshotted onto Task.reportedRemainingHours
+     * and feeds the workload v3 schedule simulation.
+     */
+    @Column(name = "remaining_hours", precision = 6, scale = 1)
+    private BigDecimal remainingHours;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }
