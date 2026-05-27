@@ -6,6 +6,7 @@ import com.iwas.notification.NotificationMessages;
 import com.iwas.notification.dto.NotificationResponse;
 import com.iwas.notification.entity.Notification;
 import com.iwas.notification.enums.NotificationType;
+import com.iwas.notification.realtime.NotificationRealtimePublisher;
 import com.iwas.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationRealtimePublisher realtimePublisher;
 
     public List<NotificationResponse> getMyNotifications(Long userId) {
         return notificationRepository.findByRecipientId(userId).stream()
@@ -73,7 +75,9 @@ public class NotificationService {
         notification.setContent(content);
         notification.setReferenceType(referenceType);
         notification.setReferenceId(referenceId);
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+        realtimePublisher.pushToUser(recipientId, toResponse(saved));
+        return saved;
     }
 
     private NotificationResponse toResponse(Notification n) {
