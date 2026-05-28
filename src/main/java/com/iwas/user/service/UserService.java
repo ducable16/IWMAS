@@ -169,7 +169,7 @@ public class UserService {
         String ext = resolveExtension(file.getOriginalFilename());
         String key = "avatars/" + userId + "/" + UUID.randomUUID() + ext;
         storageService.upload(file, key);
-        user.setAvatarUrl(key);
+        user.setAvatarId(key);
         userRepository.save(user);
         return authService.toMeResponse(user);
     }

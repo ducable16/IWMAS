@@ -19,7 +19,7 @@ public interface StorageService {
      */
     default String resolveUrl(String keyOrUrl) {
         if (keyOrUrl == null) return null;
-        if (keyOrUrl.startsWith("http://") || keyOrUrl.startsWith("https://")) return keyOrUrl;
+//        if (keyOrUrl.startsWith("http://") || keyOrUrl.startsWith("https://")) return keyOrUrl;
         return getUrl(keyOrUrl);
     }
 }

@@ -25,7 +25,7 @@ public class UserIndexEventListener {
                         .email(event.getEmail())
                         .fullName(event.getFullName())
                         .position(event.getPosition())
-                        .avatarUrl(event.getAvatarUrl())
+                        .avatarUrl(event.getAvatarId())
                         .role(event.getRole())
                         .build());
                 case DELETE -> engine.deleteUser(event.getUserId());

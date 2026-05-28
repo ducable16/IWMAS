@@ -20,6 +20,6 @@ public class UserIndexEvent implements Serializable {
     private String email;
     private String fullName;
     private String position;
-    private String avatarUrl;
+    private String avatarId;
     private String role;
 }

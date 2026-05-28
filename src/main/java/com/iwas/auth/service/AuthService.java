@@ -260,7 +260,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .avatarUrl(storageService.resolveUrl(user.getAvatarUrl()))
+                .avatarUrl(storageService.resolveUrl(user.getAvatarId()))
                 .position(user.getPosition())
                 .role(user.getRole())
                 .verified(user.getIsVerified())

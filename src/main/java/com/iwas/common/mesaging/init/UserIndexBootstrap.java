@@ -40,7 +40,7 @@ public class UserIndexBootstrap implements ApplicationRunner {
                 .email(u.getEmail())
                 .fullName(u.getFullName())
                 .position(u.getPosition())
-                .avatarUrl(u.getAvatarUrl())
+                .avatarId(u.getAvatarId())
                 .role(u.getRole() == null ? null : u.getRole().name())
                 .isActive(Boolean.TRUE.equals(u.getIsActive()))
                 .build();

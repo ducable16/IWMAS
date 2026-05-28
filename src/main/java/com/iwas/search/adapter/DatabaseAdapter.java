@@ -171,7 +171,7 @@ public class DatabaseAdapter implements SearchFallbackService {
                 .email(u.getEmail())
                 .fullName(u.getFullName())
                 .position(u.getPosition())
-                .avatarUrl(storageService.resolveUrl(u.getAvatarUrl()))
+                .avatarUrl(storageService.resolveUrl(u.getAvatarId()))
                 .role(u.getRole() == null ? null : u.getRole().name())
                 .build();
     }

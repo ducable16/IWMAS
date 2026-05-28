@@ -141,7 +141,7 @@ public class ElasticsearchAdapter implements ElasticsearchService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .position(user.getPosition())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarId(user.getAvatarUrl())
                 .role(user.getRole())
                 .isActive(true)
                 .build();
@@ -269,7 +269,7 @@ public class ElasticsearchAdapter implements ElasticsearchService {
                 .email(doc.getEmail())
                 .fullName(doc.getFullName())
                 .position(doc.getPosition())
-                .avatarUrl(storageService.resolveUrl(doc.getAvatarUrl()))
+                .avatarUrl(storageService.resolveUrl(doc.getAvatarId()))
                 .role(doc.getRole())
                 .build();
     }

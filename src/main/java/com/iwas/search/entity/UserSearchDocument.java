@@ -34,7 +34,7 @@ public class UserSearchDocument {
     private String role;
 
     @Field(type = FieldType.Keyword)
-    private String avatarUrl;
+    private String avatarId;
 
     @Field(type = FieldType.Boolean)
     private Boolean isActive;
