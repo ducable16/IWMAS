@@ -2,6 +2,7 @@ package com.iwas.task.controller;
 
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.task.dto.*;
+import com.iwas.user.dto.UserMeResponse;
 import com.iwas.task.enums.TaskPriority;
 import com.iwas.task.enums.TaskStatus;
 import com.iwas.task.enums.TaskType;
@@ -132,5 +133,12 @@ public class TaskController {
     @GetMapping("/{id}/history")
     public List<TaskStatusHistoryResponse> getStatusHistory(@PathVariable Long id) {
         return taskService.getStatusHistory(id);
+    }
+
+    @GetMapping("/{id}/assignee-candidates")
+    public List<UserMeResponse> getAssigneeCandidates(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "") String q) {
+        return taskService.getAssigneeCandidates(id, q);
     }
 }

@@ -30,29 +30,27 @@ public class EmployeeSkillController {
         return skillService.getEmployeeSkills(authenticatedUserResolver.currentUserId());
     }
 
-    @PostMapping("/me/skills")
-    @ResponseStatus(HttpStatus.CREATED)
-    public EmployeeSkillResponse addMySkill(@Valid @RequestBody EmployeeSkillRequest request) {
-        return skillService.addEmployeeSkill(authenticatedUserResolver.currentUserId(), request);
-    }
-
-    @PutMapping("/me/skills/{skillId}")
-    public EmployeeSkillResponse updateMySkill(@PathVariable Long skillId,
-                                               @Valid @RequestBody EmployeeSkillRequest request) {
-        return skillService.updateEmployeeSkill(authenticatedUserResolver.currentUserId(), skillId, request);
-    }
-
-    @DeleteMapping("/me/skills/{skillId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void removeMySkill(@PathVariable Long skillId) {
-        skillService.removeEmployeeSkill(authenticatedUserResolver.currentUserId(), skillId);
-    }
-
     @PostMapping("/{userId}/skills")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HR')")
+    @PreAuthorize("hasRole('HR')")
     @ResponseStatus(HttpStatus.CREATED)
     public EmployeeSkillResponse addEmployeeSkill(@PathVariable Long userId,
                                                   @Valid @RequestBody EmployeeSkillRequest request) {
         return skillService.addEmployeeSkill(userId, request);
+    }
+
+    @PutMapping("/{userId}/skills/{skillId}")
+    @PreAuthorize("hasRole('HR')")
+    public EmployeeSkillResponse updateEmployeeSkill(@PathVariable Long userId,
+                                                    @PathVariable Long skillId,
+                                                    @Valid @RequestBody EmployeeSkillRequest request) {
+        return skillService.updateEmployeeSkill(userId, skillId, request);
+    }
+
+    @DeleteMapping("/{userId}/skills/{skillId}")
+    @PreAuthorize("hasRole('HR')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeEmployeeSkill(@PathVariable Long userId,
+                                    @PathVariable Long skillId) {
+        skillService.removeEmployeeSkill(userId, skillId);
     }
 }

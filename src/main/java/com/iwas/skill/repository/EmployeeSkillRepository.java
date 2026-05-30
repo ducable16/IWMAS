@@ -16,6 +16,9 @@ public interface EmployeeSkillRepository extends JpaRepository<EmployeeSkill, Lo
     @Query("SELECT es FROM EmployeeSkill es WHERE es.isDeleted = false AND es.skillId = :skillId")
     List<EmployeeSkill> findBySkillId(Long skillId);
 
+    @Query("SELECT COUNT(es) FROM EmployeeSkill es WHERE es.isDeleted = false AND es.skillId = :skillId")
+    long countActiveBySkillId(Long skillId);
+
     Optional<EmployeeSkill> findByUserIdAndSkillIdAndIsDeletedFalse(Long userId, Long skillId);
 
     @Query("SELECT es FROM EmployeeSkill es WHERE es.isDeleted = false AND es.skillId = :skillId AND es.level IN :levels")

@@ -6,8 +6,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.math.BigDecimal;
-
 @Getter
 @Setter
 @Entity
@@ -32,9 +30,6 @@ public class EmployeeSkill extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "level", nullable = false, length = 20)
     private SkillLevel level;
-
-    @Column(name = "years_of_experience", precision = 4, scale = 1)
-    private BigDecimal yearsOfExperience;
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;

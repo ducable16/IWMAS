@@ -50,6 +50,11 @@ public enum ErrorCode {
     SKILL_ALREADY_EXISTS(3002, "Skill already exists", HttpStatus.CONFLICT),
     EMPLOYEE_SKILL_NOT_FOUND(3003, "Employee skill not found", HttpStatus.NOT_FOUND),
     EMPLOYEE_SKILL_ALREADY_EXISTS(3004, "Employee already has this skill", HttpStatus.CONFLICT),
+    SKILL_CATEGORY_NOT_FOUND(3005, "Skill category not found", HttpStatus.NOT_FOUND),
+    SKILL_CATEGORY_ALREADY_EXISTS(3006, "Skill category already exists", HttpStatus.CONFLICT),
+    SKILL_CATEGORY_IN_USE(3007, "Skill category is still referenced by active skills", HttpStatus.CONFLICT),
+    SKILL_IN_USE_BY_TASKS(3008, "Skill is still required by one or more active tasks", HttpStatus.CONFLICT),
+    SKILL_IN_USE_BY_MEMBERS(3009, "Skill is still assigned to one or more members", HttpStatus.CONFLICT),
 
     // --- 4xxx: Projects ---
     PROJECT_NOT_FOUND(4001, "Project not found", HttpStatus.NOT_FOUND),
@@ -68,6 +73,7 @@ public enum ErrorCode {
     TASK_ASSIGNEE_NOT_PROJECT_MEMBER(5004, "Assignee is not a member of this project", HttpStatus.BAD_REQUEST),
     TASK_INVALID_DATE_RANGE(5005, "Start date must not be after due date", HttpStatus.BAD_REQUEST),
     TASK_DATES_REQUIRED(5006, "At least one of start date or due date is required", HttpStatus.BAD_REQUEST),
+    TASK_ASSIGNEE_SKILL_NOT_MET(5007, "Assignee does not meet the required skill level for this task", HttpStatus.BAD_REQUEST),
 
     // --- 6xxx: Time Logs ---
     TIME_LOG_NOT_FOUND(6001, "Time log not found", HttpStatus.NOT_FOUND),

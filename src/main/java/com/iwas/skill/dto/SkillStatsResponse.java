@@ -4,14 +4,15 @@ import com.iwas.skill.enums.SkillLevel;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.Map;
+
 @Data
 @Builder
-public class EmployeeSkillResponse {
-    private Long id;
-    private Long userId;
+public class SkillStatsResponse {
     private Long skillId;
     private String skillName;
     private String skillCategory;
-    private SkillLevel level;
-    private String note;
+    private long memberCount;
+    private Map<SkillLevel, Long> levelDistribution;
+    private long openTaskRequirementCount;
 }

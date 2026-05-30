@@ -48,6 +48,19 @@ ALTER TABLE users
 -- Skills
 -- ================================================================
 
+CREATE TABLE IF NOT EXISTS skill_categories (
+    id bigserial PRIMARY KEY,
+    is_active boolean NOT NULL DEFAULT true,
+    is_deleted boolean NOT NULL DEFAULT false,
+    created_at timestamp NOT NULL DEFAULT now(),
+    created_by bigint,
+    updated_at timestamp,
+    updated_by bigint,
+    name varchar(100) NOT NULL,
+    description text,
+    CONSTRAINT uq_skill_category_name UNIQUE (name)
+);
+
 CREATE TABLE IF NOT EXISTS skills (
     id bigserial PRIMARY KEY,
     is_active boolean NOT NULL DEFAULT true,
@@ -57,11 +70,11 @@ CREATE TABLE IF NOT EXISTS skills (
     updated_at timestamp,
     updated_by bigint,
     name varchar(100) NOT NULL,
-    category varchar(100),
+    category_id bigint REFERENCES skill_categories(id),
     description text
 );
 
-CREATE INDEX IF NOT EXISTS idx_skill_category ON skills(category);
+CREATE INDEX IF NOT EXISTS idx_skill_category_id ON skills(category_id);
 
 CREATE TABLE IF NOT EXISTS employee_skills (
     id bigserial PRIMARY KEY,
@@ -74,7 +87,6 @@ CREATE TABLE IF NOT EXISTS employee_skills (
     user_id bigint NOT NULL REFERENCES users(id),
     skill_id bigint NOT NULL REFERENCES skills(id),
     level varchar(20) NOT NULL,
-    years_of_experience decimal(4,1),
     note text,
     CONSTRAINT uq_employee_skill UNIQUE (user_id, skill_id),
     CONSTRAINT ck_skill_level CHECK (level IN ('BEGINNER','INTERMEDIATE','ADVANCED','EXPERT'))

@@ -5,10 +5,8 @@ import lombok.Data;
 
 @Data
 @Builder
-public class SkillResponse {
+public class SkillCategoryResponse {
     private Long id;
     private String name;
-    private Long categoryId;
-    private String categoryName;
     private String description;
 }

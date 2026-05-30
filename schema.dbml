@@ -26,11 +26,24 @@ Table users {
 // Skills
 // ================================================================
 
+Table skill_categories {
+  id bigserial [pk, note: 'Primary key']
+  name varchar(100) [not null, unique, note: 'Category name (Backend, Frontend, DevOps, Soft skill...)']
+  description text [note: 'Category description']
+  is_active boolean [default: true]
+  is_deleted boolean [default: false]
+  created_at timestamp [not null, default: `now()`]
+  created_by bigint
+  updated_at timestamp
+  updated_by bigint
+}
+
 Table skills {
   id bigserial [pk, note: 'Primary key']
   name varchar(100) [not null, note: 'Skill name (Java, React, Testing, Design...)']
-  category varchar(100) [note: 'Skill category (Backend, Frontend, DevOps, Soft skill...)']
+  category_id bigint [ref: > skill_categories.id, note: 'FK to skill_categories']
   description text [note: 'Skill description']
+  is_active boolean [default: true]
   is_deleted boolean [default: false]
   created_at timestamp [not null, default: `now()`]
   created_by bigint
@@ -43,7 +56,6 @@ Table employee_skills {
   user_id bigint [not null, note: 'Employee']
   skill_id bigint [not null, note: 'Skill']
   level varchar(20) [not null, note: 'Proficiency level: BEGINNER / INTERMEDIATE / ADVANCED / EXPERT']
-  years_of_experience decimal(4,1) [note: 'Years of experience with this skill']
   note text [note: 'Additional notes (e.g. used in project X)']
   is_deleted boolean [default: false]
   created_at timestamp [not null, default: `now()`]

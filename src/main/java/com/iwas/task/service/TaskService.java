@@ -7,7 +7,10 @@ import com.iwas.notification.enums.NotificationType;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.service.ProjectService;
 import com.iwas.security.AuthenticatedUserResolver;
+import com.iwas.skill.entity.EmployeeSkill;
 import com.iwas.skill.entity.Skill;
+import com.iwas.skill.enums.SkillLevel;
+import com.iwas.skill.repository.EmployeeSkillRepository;
 import com.iwas.skill.repository.SkillRepository;
 import com.iwas.task.dto.*;
 import com.iwas.task.entity.Task;
@@ -18,6 +21,7 @@ import com.iwas.task.repository.TaskRepository;
 import com.iwas.task.repository.TaskSkillRequirementRepository;
 import com.iwas.task.repository.TaskSpecification;
 import com.iwas.task.repository.TaskStatusHistoryRepository;
+import com.iwas.user.dto.UserMeResponse;
 import com.iwas.user.entity.User;
 import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
@@ -50,6 +54,7 @@ public class TaskService {
     private final TaskSkillRequirementRepository taskSkillRequirementRepository;
     private final TaskStatusHistoryRepository taskStatusHistoryRepository;
     private final SkillRepository skillRepository;
+    private final EmployeeSkillRepository employeeSkillRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final NotificationService notificationService;
@@ -187,6 +192,7 @@ public class TaskService {
     @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse createTask(TaskRequest request, Long reporterId) {
         validateAssignee(request.getProjectId(), request.getAssigneeId());
+        validateAssigneeSkills(request.getAssigneeId(), null, request.getSkillRequirements());
         Task task = new Task();
         applyRequest(task, request);
         task.setReporterId(reporterId);
@@ -214,6 +220,7 @@ public class TaskService {
         validateAssignee(task.getProjectId(), task.getAssigneeId());
         Long oldAssigneeId = task.getAssigneeId();
         applyRequest(task, request);
+        validateAssigneeSkills(task.getAssigneeId(), id, request.getSkillRequirements());
         task = taskRepository.save(task);
 
         if (request.getSkillRequirements() != null) {
@@ -352,6 +359,28 @@ public class TaskService {
         if (!projectService.isProjectParticipant(projectId, assigneeId)) {
             throw new AppException(ErrorCode.TASK_ASSIGNEE_NOT_PROJECT_MEMBER);
         }
+    }
+
+    private void validateAssigneeSkills(Long assigneeId, Long taskId, List<TaskSkillRequirementRequest> incomingReqs) {
+        if (assigneeId == null) return;
+
+        if (incomingReqs != null) {
+            for (TaskSkillRequirementRequest req : incomingReqs) {
+                if (!Boolean.TRUE.equals(req.getIsRequired())) continue;
+                checkAssigneeHasSkill(assigneeId, req.getSkillId(), req.getMinimumLevel());
+            }
+        } else if (taskId != null) {
+            for (TaskSkillRequirement req : taskSkillRequirementRepository.findByTaskId(taskId)) {
+                if (!Boolean.TRUE.equals(req.getIsRequired())) continue;
+                checkAssigneeHasSkill(assigneeId, req.getSkillId(), req.getMinimumLevel());
+            }
+        }
+    }
+
+    private void checkAssigneeHasSkill(Long userId, Long skillId, SkillLevel minimumLevel) {
+        employeeSkillRepository.findByUserIdAndSkillIdAndIsDeletedFalse(userId, skillId)
+                .filter(es -> es.getLevel().ordinal() >= minimumLevel.ordinal())
+                .orElseThrow(() -> new AppException(ErrorCode.TASK_ASSIGNEE_SKILL_NOT_MET));
     }
 
     // --- Access control helpers ---
@@ -597,5 +626,33 @@ public class TaskService {
             default -> "createdAt";
         };
         return Sort.by(dir, field);
+    }
+
+    public List<UserMeResponse> getAssigneeCandidates(Long taskId, String q) {
+        Task task = findTask(taskId);
+        projectService.requireProjectAccess(task.getProjectId());
+
+        Set<Long> participantIds = projectService.getExistingParticipantIds(task.getProjectId());
+        if (participantIds.isEmpty()) return List.of();
+
+        List<TaskSkillRequirement> required = taskSkillRequirementRepository.findByTaskId(taskId)
+                .stream().filter(r -> Boolean.TRUE.equals(r.getIsRequired())).toList();
+
+        Set<Long> qualified = new HashSet<>(participantIds);
+        for (TaskSkillRequirement req : required) {
+            List<SkillLevel> qualifying = Arrays.stream(SkillLevel.values())
+                    .filter(l -> l.ordinal() >= req.getMinimumLevel().ordinal())
+                    .toList();
+            Set<Long> usersWithSkill = employeeSkillRepository
+                    .findBySkillIdAndLevelIn(req.getSkillId(), qualifying)
+                    .stream().map(EmployeeSkill::getUserId)
+                    .collect(Collectors.toSet());
+            qualified.retainAll(usersWithSkill);
+            if (qualified.isEmpty()) return List.of();
+        }
+
+        String keyword = "%" + (q == null ? "" : q.trim().toLowerCase()) + "%";
+        return userRepository.searchByIdsAndKeyword(new ArrayList<>(qualified), keyword, PageRequest.of(0, 20))
+                .stream().map(userMapper::toUserMeResponse).toList();
     }
 }

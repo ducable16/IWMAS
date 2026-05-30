@@ -9,18 +9,15 @@ import lombok.Setter;
 @Setter
 @Entity
 @Table(
-        name = "skills",
-        indexes = {
-                @Index(name = "idx_skill_category_id", columnList = "category_id")
+        name = "skill_categories",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_skill_category_name", columnNames = {"name"})
         }
 )
-public class Skill extends BaseEntity {
+public class SkillCategory extends BaseEntity {
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
-
-    @Column(name = "category_id")
-    private Long categoryId;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;

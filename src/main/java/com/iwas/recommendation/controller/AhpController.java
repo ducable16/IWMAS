@@ -18,8 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@RestController
-@RequestMapping("/api/ahp")
+// AHP/TOPSIS feature is currently disabled — endpoints intentionally not exposed.
+// To re-enable, uncomment @RestController and @RequestMapping below.
+//@RestController
+//@RequestMapping("/api/ahp")
 @RequiredArgsConstructor
 public class AhpController {
 
