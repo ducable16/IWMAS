@@ -89,6 +89,7 @@ public enum ErrorCode {
     SEARCH_QUERY_TOO_SHORT(9501, "Search query too short", HttpStatus.BAD_REQUEST),
     SEARCH_BACKEND_UNAVAILABLE(9502, "Search backend unavailable", HttpStatus.SERVICE_UNAVAILABLE),
     SEARCH_INDEX_FAILED(9503, "Failed to index document", HttpStatus.INTERNAL_SERVER_ERROR),
+    SEARCH_INVALID_SKILL_FILTER(9504, "Invalid requiredSkills filter", HttpStatus.BAD_REQUEST),
     ;
 
     private final int code;

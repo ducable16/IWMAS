@@ -10,6 +10,8 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 import org.springframework.data.elasticsearch.annotations.Setting;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -38,4 +40,22 @@ public class UserSearchDocument {
 
     @Field(type = FieldType.Boolean)
     private Boolean isActive;
+
+    /** Active skills owned by the user, used by the required-skill search filter. */
+    @Field(type = FieldType.Nested)
+    private List<SkillRef> skills;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SkillRef {
+
+        @Field(type = FieldType.Long)
+        private Long skillId;
+
+        /** {@code SkillLevel.ordinal()} — enables range queries for "minimum level". */
+        @Field(type = FieldType.Integer)
+        private Integer levelRank;
+    }
 }

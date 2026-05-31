@@ -1,8 +1,10 @@
 package com.iwas.search.adapter;
 
+import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.iwas.search.config.SearchProperties;
 import com.iwas.search.dto.ProjectSearchResult;
+import com.iwas.search.dto.RequiredSkill;
 import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
@@ -13,6 +15,7 @@ import com.iwas.search.repository.ElasticsearchProjectRepository;
 import com.iwas.search.repository.ElasticsearchUserRepository;
 import com.iwas.common.storage.StorageService;
 import com.iwas.search.service.ElasticsearchService;
+import com.iwas.skill.repository.EmployeeSkillRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -35,6 +38,7 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     private final ElasticsearchProjectRepository projectSearchRepository;
     private final SearchProperties properties;
     private final StorageService storageService;
+    private final EmployeeSkillRepository employeeSkillRepository;
 
     // -------------------------------------------------------------------------
     // User
@@ -44,16 +48,26 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     public SearchResponse<UserSearchResult> searchUsers(SearchRequest request) {
         long start = System.currentTimeMillis();
         int size = Math.min(request.getSize(), properties.getElasticsearch().getMaxPageSize());
+        boolean hasQuery = request.getQuery() != null && !request.getQuery().isBlank();
+        List<RequiredSkill> requiredSkills = request.getRequiredSkills() == null
+                ? List.of() : request.getRequiredSkills();
 
-        Query query = Query.of(q -> q.bool(b -> b
-                .should(s -> s.multiMatch(m -> m
-                        .query(request.getQuery())
-                        .fields("fullName", "position", "email")
-                        .fuzziness("AUTO")))
-                .should(s -> s.matchPhrasePrefix(p -> p
-                        .field("fullName")
-                        .query(request.getQuery())))
-                .filter(f -> f.term(t -> t.field("isActive").value(true)))));
+        Query query = Query.of(q -> q.bool(b -> {
+            if (hasQuery) {
+                b.should(s -> s.multiMatch(m -> m
+                                .query(request.getQuery())
+                                .fields("fullName", "position", "email")
+                                .fuzziness("AUTO")))
+                 .should(s -> s.matchPhrasePrefix(p -> p
+                                .field("fullName")
+                                .query(request.getQuery())));
+            }
+            b.filter(f -> f.term(t -> t.field("isActive").value(true)));
+            for (RequiredSkill rs : requiredSkills) {
+                b.filter(skillFilter(rs));
+            }
+            return b;
+        }));
 
         NativeQuery nq = NativeQuery.builder()
                 .withQuery(query)
@@ -136,6 +150,13 @@ public class ElasticsearchAdapter implements ElasticsearchService {
 
     @Override
     public void indexUser(UserSearchResult user) {
+        List<UserSearchDocument.SkillRef> skills = employeeSkillRepository.findByUserId(user.getId()).stream()
+                .map(es -> UserSearchDocument.SkillRef.builder()
+                        .skillId(es.getSkillId())
+                        .levelRank(es.getLevel().ordinal())
+                        .build())
+                .collect(Collectors.toList());
+
         UserSearchDocument doc = UserSearchDocument.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -144,8 +165,25 @@ public class ElasticsearchAdapter implements ElasticsearchService {
                 .avatarId(user.getAvatarUrl())
                 .role(user.getRole())
                 .isActive(true)
+                .skills(skills)
                 .build();
         userSearchRepository.save(doc);
+    }
+
+    /**
+     * Builds a nested filter requiring the user to own {@code rs.skillId} at a level
+     * within {@code rs.acceptedLevels()} (i.e. {@code >= minLevel}).
+     */
+    private Query skillFilter(RequiredSkill rs) {
+        List<FieldValue> acceptedRanks = rs.acceptedLevels().stream()
+                .map(level -> FieldValue.of((long) level.ordinal()))
+                .collect(Collectors.toList());
+        return Query.of(q -> q.nested(n -> n
+                .path("skills")
+                .query(nq -> nq.bool(nb -> nb
+                        .must(m -> m.term(t -> t.field("skills.skillId").value(rs.getSkillId())))
+                        .must(m -> m.terms(t -> t.field("skills.levelRank")
+                                .terms(tt -> tt.value(acceptedRanks))))))));
     }
 
     @Override

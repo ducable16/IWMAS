@@ -103,6 +103,12 @@ public class SearchService {
     }
 
     public SearchResponse<UserSearchResult> search(SearchRequest request) {
+        boolean hasQuery = request.getQuery() != null && !request.getQuery().isBlank();
+        boolean hasSkillFilter = request.getRequiredSkills() != null && !request.getRequiredSkills().isEmpty();
+        if (!hasQuery && !hasSkillFilter) {
+            throw new AppException(ErrorCode.SEARCH_QUERY_TOO_SHORT,
+                    "Provide a search query or at least one required skill");
+        }
         try {
             SearchResponse<UserSearchResult> result = engine.searchUsers(request);
             if (result.getItems() != null && !result.getItems().isEmpty()) {

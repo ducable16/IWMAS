@@ -2,6 +2,7 @@ package com.iwas.common.mesaging.init;
 
 import com.iwas.search.entity.UserSearchDocument;
 import com.iwas.search.repository.ElasticsearchUserRepository;
+import com.iwas.skill.repository.EmployeeSkillRepository;
 import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class UserIndexBootstrap implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final ElasticsearchUserRepository userSearchRepository;
+    private final EmployeeSkillRepository employeeSkillRepository;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -35,6 +37,12 @@ public class UserIndexBootstrap implements ApplicationRunner {
     }
 
     private UserSearchDocument toDoc(User u) {
+        List<UserSearchDocument.SkillRef> skills = employeeSkillRepository.findByUserId(u.getId()).stream()
+                .map(es -> UserSearchDocument.SkillRef.builder()
+                        .skillId(es.getSkillId())
+                        .levelRank(es.getLevel().ordinal())
+                        .build())
+                .toList();
         return UserSearchDocument.builder()
                 .id(u.getId())
                 .email(u.getEmail())
@@ -43,6 +51,7 @@ public class UserIndexBootstrap implements ApplicationRunner {
                 .avatarId(u.getAvatarId())
                 .role(u.getRole() == null ? null : u.getRole().name())
                 .isActive(Boolean.TRUE.equals(u.getIsActive()))
+                .skills(skills)
                 .build();
     }
 }

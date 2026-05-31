@@ -5,6 +5,8 @@ import com.iwas.auth.dto.UpdateProfileRequest;
 import com.iwas.auth.service.AuthService;
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.common.mesaging.event.UserIndexEvent;
+import com.iwas.common.mesaging.publisher.UserIndexEventPublisher;
 import com.iwas.common.storage.FileValidator;
 import com.iwas.common.storage.StorageService;
 import com.iwas.user.dto.AdminResetPasswordRequest;
@@ -39,6 +41,7 @@ public class UserService {
     private final StorageService storageService;
     private final FileValidator fileValidator;
     private final UserMapper userMapper;
+    private final UserIndexEventPublisher userIndexEventPublisher;
 
     public UserMeResponse getMe(Long userId) {
         return authService.toMeResponse(findUser(userId));
@@ -51,6 +54,7 @@ public class UserService {
             user.setFullName(request.getName().trim());
         }
         userRepository.save(user);
+        syncUserIndex(user);
         return authService.toMeResponse(user);
     }
 
@@ -90,7 +94,9 @@ public class UserService {
         if (request.getPosition() != null && !request.getPosition().isBlank()) {
             user.setPosition(request.getPosition().trim());
         }
-        return authService.toMeResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        syncUserIndex(saved);
+        return authService.toMeResponse(saved);
     }
 
     @Transactional
@@ -112,7 +118,9 @@ public class UserService {
         if (request.getRole() != null) {
             user.setRole(request.getRole());
         }
-        return authService.toMeResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        syncUserIndex(saved);
+        return authService.toMeResponse(saved);
     }
 
     public UserPageResponse getAllUsers(UserFilterRequest filter, UserRole callerRole) {
@@ -159,6 +167,7 @@ public class UserService {
         User user = findUser(userId);
         user.setIsActive(active);
         userRepository.save(user);
+        syncUserIndex(user);
         return authService.toMeResponse(user);
     }
 
@@ -171,7 +180,34 @@ public class UserService {
         storageService.upload(file, key);
         user.setAvatarId(key);
         userRepository.save(user);
+        syncUserIndex(user);
         return authService.toMeResponse(user);
+    }
+
+    /**
+     * Keeps the {@code iwas-users} Elasticsearch index in sync after a searchable-field
+     * change. Active, non-deleted users are upserted (the index holds only active users);
+     * deactivated/deleted users are removed.
+     */
+    private void syncUserIndex(User user) {
+        boolean searchable = Boolean.TRUE.equals(user.getIsActive())
+                && !Boolean.TRUE.equals(user.getIsDeleted());
+        if (searchable) {
+            userIndexEventPublisher.publish(UserIndexEvent.builder()
+                    .op(UserIndexEvent.Op.UPSERT)
+                    .userId(user.getId())
+                    .email(user.getEmail())
+                    .fullName(user.getFullName())
+                    .position(user.getPosition())
+                    .avatarId(user.getAvatarId())
+                    .role(user.getRole() == null ? null : user.getRole().name())
+                    .build());
+        } else {
+            userIndexEventPublisher.publish(UserIndexEvent.builder()
+                    .op(UserIndexEvent.Op.DELETE)
+                    .userId(user.getId())
+                    .build());
+        }
     }
 
     private User findUser(Long userId) {

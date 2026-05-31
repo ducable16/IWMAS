@@ -2,6 +2,7 @@ package com.iwas.search.controller;
 
 import com.iwas.search.dto.AutocompleteResponse;
 import com.iwas.search.dto.ProjectSearchResult;
+import com.iwas.search.dto.RequiredSkill;
 import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.UserSearchResult;
@@ -37,13 +38,16 @@ public class SearchController {
 
     @GetMapping("/search")
     public SearchResponse<UserSearchResult> search(
-            @RequestParam("q") @NotBlank String q,
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "requiredSkills", required = false) String requiredSkills,
             @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
             @RequestParam(value = "size", defaultValue = "20") @Min(1) int size,
             @RequestParam(value = "sortBy", required = false) String sortBy,
             @RequestParam(value = "sortDir", defaultValue = "desc") String sortDir) {
         SearchRequest req = SearchRequest.builder()
-                .query(q).page(page).size(size).sortBy(sortBy).sortDir(sortDir).build();
+                .query(q)
+                .requiredSkills(RequiredSkill.parse(requiredSkills))
+                .page(page).size(size).sortBy(sortBy).sortDir(sortDir).build();
         return searchService.search(req);
     }
 

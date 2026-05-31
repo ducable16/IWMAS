@@ -65,6 +65,7 @@ app:
     search-project-sync-queue: search.project.sync
     search-project-sync-exchange: search.project.sync.exchange
   search:
+    bootstrap-on-startup: true
     autocomplete:
       max-suggestions: 10
       cache-ttl-seconds: 60

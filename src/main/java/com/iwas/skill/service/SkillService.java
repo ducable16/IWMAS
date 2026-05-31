@@ -2,6 +2,8 @@ package com.iwas.skill.service;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
+import com.iwas.common.mesaging.event.UserIndexEvent;
+import com.iwas.common.mesaging.publisher.UserIndexEventPublisher;
 import com.iwas.common.storage.StorageService;
 import com.iwas.project.entity.Project;
 import com.iwas.project.entity.ProjectMember;
@@ -45,6 +47,7 @@ public class SkillService {
     private final ProjectMemberRepository projectMemberRepository;
     private final TaskSkillRequirementRepository taskSkillRequirementRepository;
     private final StorageService storageService;
+    private final UserIndexEventPublisher userIndexEventPublisher;
 
     public List<SkillResponse> getAllSkills(String keyword, Long categoryId) {
         String kw = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
@@ -136,6 +139,7 @@ public class SkillService {
         employeeSkill.setLevel(request.getLevel());
         employeeSkill.setNote(request.getNote());
         EmployeeSkill saved = employeeSkillRepository.save(employeeSkill);
+        publishUserSkillSync(userId);
         return toEmployeeSkillResponse(saved, skill, resolveCategories(List.of(skill)));
     }
 
@@ -150,6 +154,7 @@ public class SkillService {
 
         Skill skill = findSkill(employeeSkill.getSkillId());
         EmployeeSkill saved = employeeSkillRepository.save(employeeSkill);
+        publishUserSkillSync(userId);
         return toEmployeeSkillResponse(saved, skill, resolveCategories(List.of(skill)));
     }
 
@@ -160,6 +165,26 @@ public class SkillService {
                 .orElseThrow(() -> new AppException(ErrorCode.EMPLOYEE_SKILL_NOT_FOUND));
         employeeSkill.setIsDeleted(true);
         employeeSkillRepository.save(employeeSkill);
+        publishUserSkillSync(userId);
+    }
+
+    /**
+     * Re-publishes the user's search document so the {@code skills} nested field stays in
+     * sync with Elasticsearch after an employee-skill change. No-op for inactive/deleted
+     * users (the search index only holds active users).
+     */
+    private void publishUserSkillSync(Long userId) {
+        userRepository.findById(userId)
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && !Boolean.TRUE.equals(u.getIsDeleted()))
+                .ifPresent(u -> userIndexEventPublisher.publish(UserIndexEvent.builder()
+                        .op(UserIndexEvent.Op.UPSERT)
+                        .userId(u.getId())
+                        .email(u.getEmail())
+                        .fullName(u.getFullName())
+                        .position(u.getPosition())
+                        .avatarId(u.getAvatarId())
+                        .role(u.getRole() == null ? null : u.getRole().name())
+                        .build()));
     }
 
     public List<SkillMemberResponse> getMembersBySkill(Long skillId, SkillLevel minLevel, Long excludeProjectId) {
