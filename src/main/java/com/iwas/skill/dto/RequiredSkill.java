@@ -1,4 +1,4 @@
-package com.iwas.search.dto;
+package com.iwas.skill.dto;
 
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
@@ -15,9 +15,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * One required-skill constraint for user search: the user must own {@code skillId}
- * at {@code minLevel} or higher. A {@code null} {@code minLevel} means "owns the skill,
- * any level".
+ * One required-skill constraint: the subject must own {@code skillId} at {@code minLevel}
+ * or higher. A {@code null} {@code minLevel} means "owns the skill, any level". Shared by
+ * global user search and project-scoped member search.
  */
 @Data
 @Builder

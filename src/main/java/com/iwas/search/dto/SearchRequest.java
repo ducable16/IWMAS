@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.Builder.Default;
+import com.iwas.skill.dto.RequiredSkill;
 
 import java.util.List;
 

@@ -48,7 +48,7 @@ public class SearchService {
 
         if (projectId != null) {
             List<SuggestionItem> suggestions = projectService
-                    .searchProjectMembers(projectId, query, topN)
+                    .searchProjectMembers(projectId, query, List.of(), topN)
                     .stream()
                     .map(u -> SuggestionItem.builder().term(u.getFullName()).entityId(u.getId()).build())
                     .toList();

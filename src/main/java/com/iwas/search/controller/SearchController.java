@@ -2,8 +2,8 @@ package com.iwas.search.controller;
 
 import com.iwas.search.dto.AutocompleteResponse;
 import com.iwas.search.dto.ProjectSearchResult;
-import com.iwas.search.dto.RequiredSkill;
 import com.iwas.search.dto.SearchRequest;
+import com.iwas.skill.dto.RequiredSkill;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.UserSearchResult;
 import com.iwas.search.service.SearchService;

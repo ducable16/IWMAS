@@ -3,6 +3,7 @@ package com.iwas.project.controller;
 import com.iwas.project.dto.*;
 import com.iwas.project.service.ProjectService;
 import com.iwas.security.AuthenticatedUserResolver;
+import com.iwas.skill.dto.RequiredSkill;
 import com.iwas.user.dto.UserMeResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -74,8 +75,9 @@ public class ProjectController {
     public List<UserMeResponse> searchMembers(
             @PathVariable Long id,
             @RequestParam(defaultValue = "") String q,
+            @RequestParam(value = "requiredSkills", required = false) String requiredSkills,
             @RequestParam(defaultValue = "10") int size) {
-        return projectService.searchProjectMembers(id, q, size);
+        return projectService.searchProjectMembers(id, q, RequiredSkill.parse(requiredSkills), size);
     }
 
     @PostMapping("/{id}/members")

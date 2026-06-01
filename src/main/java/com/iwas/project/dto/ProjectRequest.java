@@ -1,6 +1,8 @@
 package com.iwas.project.dto;
 
 import com.iwas.project.enums.ProjectStatus;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -32,4 +34,9 @@ public class ProjectRequest {
 
     @NotNull(message = "Manager ID is required")
     private Long managerId;
+
+    // Required on create (validated in ProjectService.createProject), ignored on update.
+    @Min(value = 1, message = "Manager allocated effort must be at least 1")
+    @Max(value = 100, message = "Manager allocated effort must be at most 100")
+    private Integer managerAllocationPercent;
 }

@@ -18,6 +18,9 @@ import com.iwas.project.repository.ProjectMemberRepository;
 import com.iwas.project.repository.ProjectRepository;
 import com.iwas.project.repository.ProjectSpecification;
 import com.iwas.security.AuthenticatedUserResolver;
+import com.iwas.skill.dto.RequiredSkill;
+import com.iwas.skill.entity.EmployeeSkill;
+import com.iwas.skill.repository.EmployeeSkillRepository;
 import com.iwas.user.dto.UserMeResponse;
 import com.iwas.user.entity.User;
 import com.iwas.user.mapper.UserMapper;
@@ -55,6 +58,7 @@ public class ProjectService {
     private final ProjectCodeService projectCodeService;
     private final UserMapper userMapper;
     private final TaskRepository taskRepository;
+    private final EmployeeSkillRepository employeeSkillRepository;
 
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
         String role = authenticatedUserResolver.currentUserRole();
@@ -175,6 +179,23 @@ public class ProjectService {
 
     @Transactional
     public ProjectResponse createProject(ProjectRequest request) {
+        Project project = new Project();
+        project.setStartDate(request.getStartDate());
+        project.setEndDate(request.getEndDate());
+
+        // Build the PM's LEAD membership and validate its effort first (fail-fast, before anything is
+        // persisted). The candidate window is the PM membership's own [joinDate, leaveDate] window
+        // (joinDate = project start or today; leaveDate null -> project end). Throws
+        // PROJECT_MEMBER_ALLOC_REQUIRED when null/<=0 and USER_OVER_ALLOCATED when over capacity; any
+        // failure rolls back the whole transaction, so we never leave a project without its PM member.
+        ProjectMember pmMember = new ProjectMember();
+        pmMember.setUserId(request.getManagerId());
+        pmMember.setRoleInProject(ProjectRoleInProject.LEAD);
+        pmMember.setAllocatedEffortPercent(request.getManagerAllocationPercent());
+        pmMember.setJoinDate(request.getStartDate() != null ? request.getStartDate() : LocalDate.now());
+        checkAllocationLimit(pmMember.getUserId(), pmMember.getAllocatedEffortPercent(),
+                membershipStart(pmMember, project), membershipEnd(pmMember, project), null);
+
         String code;
         try {
             code = projectCodeService.resolveForCreate(request.getCode(), request.getName());
@@ -182,15 +203,17 @@ public class ProjectService {
             throw new AppException(ErrorCode.PROJECT_CODE_ALREADY_EXISTS);
         }
 
-        Project project = new Project();
         project.setName(request.getName().trim());
         project.setCode(code);
         project.setDescription(request.getDescription());
         project.setStatus(request.getStatus());
-        project.setStartDate(request.getStartDate());
-        project.setEndDate(request.getEndDate());
         project.setManagerId(request.getManagerId());
         Project saved = projectRepository.save(project);
+
+        // Atomically add the PM (managerId) as a LEAD member with the requested effort.
+        pmMember.setProjectId(saved.getId());
+        projectMemberRepository.save(pmMember);
+
         projectIndexEventPublisher.publish(toUpsertEvent(saved));
         return toProjectResponse(saved);
     }
@@ -206,12 +229,17 @@ public class ProjectService {
             }
         }
 
+        // Manager is immutable: the PM's LEAD membership + effort allocation are set atomically at
+        // creation, and update does not manage membership. Reject any attempt to change managerId.
+        if (request.getManagerId() != null && !request.getManagerId().equals(project.getManagerId())) {
+            throw new AppException(ErrorCode.PROJECT_MANAGER_IMMUTABLE);
+        }
+
         project.setName(request.getName().trim());
         project.setDescription(request.getDescription());
         project.setStatus(request.getStatus());
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
-        project.setManagerId(request.getManagerId());
         Project saved = projectRepository.save(project);
         projectIndexEventPublisher.publish(toUpsertEvent(saved));
         return toProjectResponse(saved);
@@ -247,8 +275,6 @@ public class ProjectService {
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, request.getUserId())
                 .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
 
-        checkAllocationLimit(request.getUserId(), request.getAllocatedEffortPercent(), null);
-
         ProjectMember member = new ProjectMember();
         member.setProjectId(projectId);
         member.setUserId(request.getUserId());
@@ -256,6 +282,10 @@ public class ProjectService {
         member.setAllocatedEffortPercent(request.getAllocatedEffortPercent());
         member.setJoinDate(request.getJoinDate() != null ? request.getJoinDate() : LocalDate.now());
         member.setNote(request.getNote());
+
+        // Validate against peak concurrent allocation over this membership's own window.
+        checkAllocationLimit(member.getUserId(), member.getAllocatedEffortPercent(),
+                membershipStart(member, project), membershipEnd(member, project), null);
 
         String userName = userRepository.findById(request.getUserId())
                 .map(User::getFullName).orElse(null);
@@ -275,7 +305,11 @@ public class ProjectService {
                 .filter(pm -> pm.getProjectId().equals(projectId) && !Boolean.TRUE.equals(pm.getIsDeleted()))
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_MEMBER_NOT_FOUND));
 
-        checkAllocationLimit(member.getUserId(), request.getAllocatedEffortPercent(), memberId);
+        Project project = findProject(projectId);
+        // Window = this membership's own [joinDate, leaveDate] (update does not change those);
+        // the membership itself is excluded from the existing-load sweep via memberId.
+        checkAllocationLimit(member.getUserId(), request.getAllocatedEffortPercent(),
+                membershipStart(member, project), membershipEnd(member, project), memberId);
 
         member.setRoleInProject(request.getRoleInProject());
         member.setAllocatedEffortPercent(request.getAllocatedEffortPercent());
@@ -287,12 +321,22 @@ public class ProjectService {
     }
 
     /**
-     * Acquires a row-level lock on the user row, then validates that adding
-     * newAllocation% would not push the user's total active allocation above 100%.
-     * The lock serializes concurrent allocation changes for the same user within
-     * the surrounding @Transactional boundary.
+     * Acquires a row-level lock on the user row, then validates that allocating newAllocation%
+     * over the candidate window [newStart, newEnd] would not push the user's PEAK CONCURRENT
+     * allocation above 100% at any point inside that window.
+     *
+     * <p>All of the user's non-soft-deleted memberships on projects that are not COMPLETED/CANCELLED
+     * are considered, each weighted over its own [joinDate, leaveDate] window (a past leaveDate simply
+     * means the membership no longer overlaps the candidate window and drops out).
+     * This matches the peak-concurrent semantics of the effort-remaining panel
+     * ({@link #getUserEffortRemaining}) rather than a date-agnostic flat sum. Null project dates
+     * are treated as open-ended (effectively "always active").
+     *
+     * <p>The lock serializes concurrent allocation changes for the same user within the
+     * surrounding {@link Transactional} boundary.
      */
-    private void checkAllocationLimit(Long userId, Integer newAllocation, Long excludeMemberId) {
+    private void checkAllocationLimit(Long userId, Integer newAllocation,
+                                      LocalDate newStart, LocalDate newEnd, Long excludeMemberId) {
         if (newAllocation == null || newAllocation <= 0) {
             throw new AppException(ErrorCode.PROJECT_MEMBER_ALLOC_REQUIRED);
         }
@@ -300,14 +344,66 @@ public class ProjectService {
         userRepository.findByIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        Long current = excludeMemberId == null
-                ? projectMemberRepository.sumActiveAllocationByUserId(userId)
-                : projectMemberRepository.sumActiveAllocationExcluding(userId, excludeMemberId);
+        LocalDate windowStart = newStart != null ? newStart : MIN_ALLOC_DATE;
+        LocalDate windowEnd   = newEnd   != null ? newEnd   : MAX_ALLOC_DATE;
 
-        long currentTotal = current == null ? 0L : current;
-        if (currentTotal + newAllocation > 100) {
+        List<ProjectMember> memberships = projectMemberRepository.findByUserIdAndIsDeletedFalse(userId).stream()
+                .filter(pm -> excludeMemberId == null || !pm.getId().equals(excludeMemberId))
+                .filter(pm -> pm.getAllocatedEffortPercent() != null && pm.getAllocatedEffortPercent() > 0)
+                .toList();
+        if (memberships.isEmpty()) {
+            return; // nothing else allocated; newAllocation (<=100) always fits
+        }
+
+        Map<Long, Project> projects = projectRepository
+                .findAllById(memberships.stream().map(ProjectMember::getProjectId).toList())
+                .stream().collect(Collectors.toMap(Project::getId, p -> p));
+
+        // Sweep existing allocations clamped to the candidate window; find the peak concurrent
+        // load that the new allocation would stack on top of. Each membership is weighted over its
+        // own [joinDate, leaveDate] window (falling back to the project timeline), so a membership
+        // with a future leaveDate still counts until then, and one that has already ended drops out.
+        TreeMap<LocalDate, Integer> deltas = new TreeMap<>();
+        for (ProjectMember pm : memberships) {
+            Project p = projects.get(pm.getProjectId());
+            if (p == null) continue;
+            if (p.getStatus() == ProjectStatus.COMPLETED || p.getStatus() == ProjectStatus.CANCELLED) continue;
+
+            LocalDate s = membershipStart(pm, p);
+            LocalDate e = membershipEnd(pm, p);
+            if (s.isAfter(windowEnd) || e.isBefore(windowStart)) continue; // no overlap with candidate window
+
+            LocalDate clampedStart = s.isBefore(windowStart) ? windowStart : s;
+            LocalDate clampedEnd   = e.isAfter(windowEnd)    ? windowEnd   : e;
+            deltas.merge(clampedStart, pm.getAllocatedEffortPercent(), Integer::sum);
+            deltas.merge(clampedEnd.plusDays(1), -pm.getAllocatedEffortPercent(), Integer::sum);
+        }
+
+        int peakExisting = 0, running = 0;
+        for (int delta : deltas.values()) {
+            running += delta;
+            peakExisting = Math.max(peakExisting, running);
+        }
+
+        if (peakExisting + newAllocation > 100) {
             throw new AppException(ErrorCode.USER_OVER_ALLOCATED);
         }
+    }
+
+    /** Open-ended sentinels for allocations whose start/end dates are unknown (null). */
+    private static final LocalDate MIN_ALLOC_DATE = LocalDate.of(2000, 1, 1);
+    private static final LocalDate MAX_ALLOC_DATE = LocalDate.of(9999, 12, 30);
+
+    /** First day a membership consumes capacity: its joinDate, else the project start, else open. */
+    private LocalDate membershipStart(ProjectMember pm, Project p) {
+        if (pm.getJoinDate() != null) return pm.getJoinDate();
+        return p.getStartDate() != null ? p.getStartDate() : MIN_ALLOC_DATE;
+    }
+
+    /** Last day a membership consumes capacity (inclusive): its leaveDate, else the project end, else open. */
+    private LocalDate membershipEnd(ProjectMember pm, Project p) {
+        if (pm.getLeaveDate() != null) return pm.getLeaveDate();
+        return p.getEndDate() != null ? p.getEndDate() : MAX_ALLOC_DATE;
     }
 
     @Transactional
@@ -352,24 +448,53 @@ public class ProjectService {
         return ids;
     }
 
-    public List<UserMeResponse> searchProjectMembers(Long projectId, String q, int size) {
+    public List<UserMeResponse> searchProjectMembers(Long projectId, String q,
+                                                     List<RequiredSkill> requiredSkills, int size) {
         Project project = findProject(projectId);
         requireProjectAccess(projectId);
 
+        // Active participants only = manager + active members (leaveDate IS NULL or still in the future),
+        // matching task-assignee eligibility (ProjectService.isProjectParticipant).
         Set<Long> participantIds = new HashSet<>();
-        participantIds.add(project.getManagerId());
-        projectMemberRepository.findByProjectId(projectId)
+        if (project.getManagerId() != null) {
+            participantIds.add(project.getManagerId());
+        }
+        projectMemberRepository.findActiveMembersByProjectId(projectId)
                 .stream().map(ProjectMember::getUserId)
                 .forEach(participantIds::add);
 
         if (participantIds.isEmpty()) return List.of();
 
+        Set<Long> candidateIds = filterByRequiredSkills(participantIds, requiredSkills);
+        if (candidateIds.isEmpty()) return List.of();
+
         String keyword = "%" + (q == null ? "" : q.trim().toLowerCase()) + "%";
-        int limit = Math.min(size, 20);
+        int limit = Math.min(size, 50);
         List<User> users = userRepository.searchByIdsAndKeyword(
-                new ArrayList<>(participantIds), keyword, PageRequest.of(0, limit));
+                new ArrayList<>(candidateIds), keyword, PageRequest.of(0, limit));
 
         return users.stream().map(userMapper::toUserMeResponse).toList();
+    }
+
+    /**
+     * Narrows {@code participantIds} to those owning ALL of {@code requiredSkills}, each at
+     * its minimum level or higher (AND across skills). Returns the input set unchanged when
+     * no skill constraints are given.
+     */
+    private Set<Long> filterByRequiredSkills(Set<Long> participantIds, List<RequiredSkill> requiredSkills) {
+        if (requiredSkills == null || requiredSkills.isEmpty()) {
+            return participantIds;
+        }
+        Set<Long> result = new HashSet<>(participantIds);
+        for (RequiredSkill rs : requiredSkills) {
+            Set<Long> holders = employeeSkillRepository
+                    .findBySkillIdAndLevelIn(rs.getSkillId(), rs.acceptedLevels())
+                    .stream().map(EmployeeSkill::getUserId)
+                    .collect(Collectors.toSet());
+            result.retainAll(holders);
+            if (result.isEmpty()) break;
+        }
+        return result;
     }
 
     // --- Access control helpers ---
@@ -423,7 +548,7 @@ public class ProjectService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        List<ProjectMember> activeMemberships = projectMemberRepository.findActiveProjectsByUserId(userId);
+        List<ProjectMember> activeMemberships = projectMemberRepository.findByUserIdAndIsDeletedFalse(userId);
         if (activeMemberships.isEmpty()) {
             return emptyEffortResponse(userId, user.getFullName(), startDate, endDate, detail);
         }
@@ -438,7 +563,8 @@ public class ProjectService {
                     if (p == null) return false;
                     if (p.getStatus() == ProjectStatus.COMPLETED || p.getStatus() == ProjectStatus.CANCELLED) return false;
                     if (startDate == null && endDate == null) return true;
-                    return periodsOverlap(p.getStartDate(), p.getEndDate(), startDate, endDate);
+                    // Weigh by the member's own [joinDate, leaveDate] window, not the raw project dates.
+                    return periodsOverlap(membershipStart(pm, p), membershipEnd(pm, p), startDate, endDate);
                 })
                 .toList();
 
@@ -446,10 +572,8 @@ public class ProjectService {
                 .filter(pm -> pm.getAllocatedEffortPercent() != null && pm.getAllocatedEffortPercent() > 0)
                 .map(pm -> {
                     Project p = projectMap.get(pm.getProjectId());
-                    LocalDate s = p.getStartDate() != null ? p.getStartDate() : LocalDate.of(2000, 1, 1);
-                    LocalDate e = p.getEndDate()   != null ? p.getEndDate()   : LocalDate.of(9999, 12, 30);
-                    return new AllocationInterval(s, e, pm.getAllocatedEffortPercent(),
-                            p.getId(), p.getName(), p.getCode());
+                    return new AllocationInterval(membershipStart(pm, p), membershipEnd(pm, p),
+                            pm.getAllocatedEffortPercent(), p.getId(), p.getName(), p.getCode());
                 })
                 .toList();
 
