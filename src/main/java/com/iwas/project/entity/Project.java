@@ -13,9 +13,6 @@ import java.time.LocalDate;
 @Entity
 @Table(
         name = "projects",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uq_project_code", columnNames = {"code"})
-        },
         indexes = {
                 @Index(name = "idx_project_manager", columnList = "manager_id"),
                 @Index(name = "idx_project_status", columnList = "status")
@@ -26,7 +23,7 @@ public class Project extends BaseEntity {
     @Column(name = "name", nullable = false, length = 200)
     private String name;
 
-    @Column(name = "code", unique = true, length = 10, updatable = false)
+    @Column(name = "code", length = 10, updatable = false)
     private String code;
 
     @Column(name = "description", columnDefinition = "TEXT")

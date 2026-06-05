@@ -1,5 +1,10 @@
 package com.iwas.workload.service;
 
+import com.iwas.arrangement.config.AtcProperties;
+import com.iwas.arrangement.core.AtcTaskMapper;
+import com.iwas.arrangement.core.TardinessArranger;
+import com.iwas.arrangement.model.AtcConfig;
+import com.iwas.arrangement.model.AtcTask;
 import com.iwas.common.enums.ErrorCode;
 import com.iwas.common.exception.AppException;
 import com.iwas.notification.NotificationMessages;
@@ -70,6 +75,8 @@ public class WorkloadService {
     private final TaskRepository taskRepository;
     private final NotificationService notificationService;
     private final ScheduleSimulator scheduleSimulator;
+    private final TardinessArranger tardinessArranger;
+    private final AtcProperties atcProperties;
 
     private static final double DEFAULT_DAILY_HOURS = 8.0;
     private static final BigDecimal TIGHT_THRESHOLD = BigDecimal.valueOf(85);
@@ -131,9 +138,10 @@ public class WorkloadService {
     /**
      * Orders a lane's workable tasks. Uses the member's saved executionSeq only
      * when every workable task has one (a complete custom plan); otherwise falls
-     * back to EDD. The order is a forecasting hint, not an execution constraint.
+     * back to the ATC heuristic suggestion. The order is a forecasting hint, not
+     * an execution constraint.
      */
-    private List<ScheduledTask> orderLane(List<Task> workable) {
+    private List<ScheduledTask> orderLane(List<Task> workable, BigDecimal dailyCap) {
         boolean allHaveSeq = !workable.isEmpty()
                 && workable.stream().allMatch(t -> t.getExecutionSeq() != null);
         if (allHaveSeq) {
@@ -142,8 +150,28 @@ public class WorkloadService {
                     .map(WorkloadService::toScheduledTask)
                     .toList();
         }
-        return ScheduleSimulator.eddOrder(
-                workable.stream().map(WorkloadService::toScheduledTask).toList());
+        return atcOrder(workable, dailyCap);
+    }
+
+    /**
+     * System-suggested order via the ATC (Apparent Tardiness Cost) heuristic for
+     * total weighted tardiness — a high-performance heuristic, not a proven
+     * optimum. Deadlines are measured in the lane's capacity-hours so slack and
+     * processing time share one unit.
+     */
+    private List<ScheduledTask> atcOrder(List<Task> workable, BigDecimal dailyCap) {
+        if (workable.isEmpty()) return List.of();
+        double cap = dailyCap != null ? dailyCap.doubleValue() : 0.0;
+        LocalDate today = LocalDate.now();
+        AtcConfig config = AtcConfig.from(atcProperties);
+        List<AtcTask> atcTasks = workable.stream()
+                .map(t -> AtcTaskMapper.from(t, today, cap))
+                .toList();
+        Map<Long, Task> byId = workable.stream()
+                .collect(Collectors.toMap(Task::getId, t -> t));
+        return tardinessArranger.orderTaskIds(atcTasks, config).stream()
+                .map(id -> toScheduledTask(byId.get(id)))
+                .toList();
     }
 
     private LaneResult computeLane(User user, Project project, ProjectMember pmRow,
@@ -167,7 +195,7 @@ public class WorkloadService {
             level = (alloc != null && alloc == 0) ? WorkloadLevel.BLOCKED : WorkloadLevel.UNDEFINED;
         } else {
             List<Task> workable = laneTasks.stream().filter(WorkloadService::isWorkable).toList();
-            LaneSimulation sim = scheduleSimulator.simulate(orderLane(workable), dailyCap, today);
+            LaneSimulation sim = scheduleSimulator.simulate(orderLane(workable, dailyCap), dailyCap, today);
             for (TaskSchedule ts : sim.schedules()) scheduleByTask.put(ts.taskId(), ts);
             nearPct = sim.nearTermPercent();
             overallPct = sim.overallPercent();
@@ -515,16 +543,14 @@ public class WorkloadService {
         ScheduleContext ctx = loadScheduleContext(userId, projectId);
         boolean saved = !ctx.workable().isEmpty()
                 && ctx.workable().stream().allMatch(t -> t.getExecutionSeq() != null);
-        return buildProjectSchedule(ctx, orderLane(ctx.workable()), saved, today);
+        return buildProjectSchedule(ctx, orderLane(ctx.workable(), ctx.dailyCap()), saved, today);
     }
 
-    /** EDD-optimal order suggestion — a preview, not persisted. */
+    /** ATC heuristic order suggestion — a preview, not persisted. */
     public ProjectScheduleResponse suggestSchedule(Long userId, Long projectId) {
         LocalDate today = LocalDate.now();
         ScheduleContext ctx = loadScheduleContext(userId, projectId);
-        List<ScheduledTask> edd = ScheduleSimulator.eddOrder(
-                ctx.workable().stream().map(WorkloadService::toScheduledTask).toList());
-        return buildProjectSchedule(ctx, edd, false, today);
+        return buildProjectSchedule(ctx, atcOrder(ctx.workable(), ctx.dailyCap()), false, today);
     }
 
     /** Simulates a member-proposed order without persisting it. */

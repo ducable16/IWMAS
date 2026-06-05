@@ -429,7 +429,10 @@ public class TaskService {
     /**
      * Date resolution rules for workload model v2.1:
      *  - Both null              → reject (TASK_DATES_REQUIRED).
-     *  - Only dueDate set       → default startDate = today (deadline-driven, rate fits span).
+     *  - Only dueDate set       → startDate stays null (no planned start; the
+     *                             arrangement engine projects one as output, and
+     *                             the workload simulator treats null start as
+     *                             "released today").
      *  - Only startDate set:
      *      • with estimate      → default dueDate = startDate + ceil(estimated) workdays − 1
      *                             (drip ~1h/day for open-ended tasks).
@@ -443,9 +446,10 @@ public class TaskService {
             throw new AppException(ErrorCode.TASK_DATES_REQUIRED);
         }
 
-        LocalDate start = requestedStart != null ? requestedStart : LocalDate.now();
+        LocalDate start = requestedStart; // optional — kept null when not provided
         LocalDate due = requestedDue;
         if (due == null) {
+            // start is guaranteed non-null here (both-null already rejected above)
             int wd;
             BigDecimal estimated = task.getEstimatedHours();
             if (estimated != null && estimated.signum() > 0) {
@@ -456,7 +460,7 @@ public class TaskService {
             due = addWorkdays(start, wd - 1);
         }
 
-        if (start.isAfter(due)) {
+        if (start != null && start.isAfter(due)) {
             throw new AppException(ErrorCode.TASK_INVALID_DATE_RANGE);
         }
 

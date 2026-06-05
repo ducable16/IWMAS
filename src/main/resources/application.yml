@@ -74,6 +74,15 @@ app:
       user-index: iwas-users
       project-index: iwas-projects
       max-page-size: 50
+  arrangement:
+    k: 2.0
+    min-estimate-hours: 1
+    priority-fallback: LOW
+    weights:
+      CRITICAL: 8
+      HIGH: 4
+      MEDIUM: 2
+      LOW: 1
   frontend:
     base-url: http://localhost:3000
   ws:
@@ -95,5 +104,5 @@ app:
     expiration: 86400000
 
 logging:
-    level:
-        org.hibernate: ERROR
+  level:
+    org.hibernate: ERROR

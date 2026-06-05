@@ -1,5 +1,7 @@
 package com.iwas.workload.service;
 
+import com.iwas.arrangement.config.AtcProperties;
+import com.iwas.arrangement.core.TardinessArranger;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.entity.Project;
 import com.iwas.project.entity.ProjectMember;
@@ -49,6 +51,8 @@ class WorkloadServiceTest {
     @Mock BurnoutLogRepository burnoutLogRepo;
     @Mock NotificationService notificationService;
     @Spy ScheduleSimulator scheduleSimulator = new ScheduleSimulator();
+    @Spy TardinessArranger tardinessArranger = new TardinessArranger();
+    @Spy AtcProperties atcProperties = new AtcProperties();
 
     @InjectMocks WorkloadService service;
 
