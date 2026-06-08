@@ -7,7 +7,6 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @Data
 public class TaskFilterRequest {
@@ -26,15 +25,9 @@ public class TaskFilterRequest {
 
     private List<TaskType> types;
 
-    private List<String> labels;
-
-    private String sprint;
-
     private LocalDate dueDateFrom;
 
     private LocalDate dueDateTo;
-
-    private Map<String, String> customFields;
 
     private String sortBy = "createdAt";
 

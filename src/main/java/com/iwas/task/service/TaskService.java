@@ -418,9 +418,6 @@ public class TaskService {
         task.setPriority(request.getPriority());
         task.setEstimatedHours(request.getEstimatedHours());
         task.setAssigneeId(request.getAssigneeId());
-        task.setSprint(request.getSprint());
-        task.setLabels(request.getLabels() != null ? request.getLabels() : new HashSet<>());
-        task.setCustomFields(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
         resolveAndApplyDates(task, request.getStartDate(), request.getDueDate());
     }
 
@@ -579,9 +576,6 @@ public class TaskService {
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())
-                .sprint(t.getSprint())
-                .labels(t.getLabels())
-                .customFields(t.getCustomFields())
                 .assignee(userMapper.toPublicView(assignee))
                 .reporter(userMapper.toPublicView(reporter))
                 .skillRequirements(skillReqs)
@@ -607,9 +601,6 @@ public class TaskService {
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())
-                .sprint(t.getSprint())
-                .labels(t.getLabels())
-                .customFields(t.getCustomFields())
                 .assignee(userMapper.toPublicView(assignee))
                 .reporter(userMapper.toPublicView(reporter))
                 .skillRequirements(getSkillRequirements(t.getId()))

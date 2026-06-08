@@ -16,8 +16,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -36,24 +34,13 @@ public class TaskController {
             @RequestParam(required = false) Long reporterId,
             @RequestParam(required = false) List<TaskPriority> priorities,
             @RequestParam(required = false) List<TaskType> types,
-            @RequestParam(required = false) List<String> labels,
-            @RequestParam(required = false) String sprint,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateTo,
-            @RequestParam(required = false) Map<String, String> customFields,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        Set<String> knownParams = Set.of("search", "projectId", "statuses", "assigneeId", "reporterId",
-                "priorities", "types", "labels", "sprint", "dueDateFrom", "dueDateTo",
-                "sortBy", "sortDirection", "page", "size");
-        Map<String, String> onlyCustomFields = customFields == null ? null :
-                customFields.entrySet().stream()
-                        .filter(e -> !knownParams.contains(e.getKey()))
-                        .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
         TaskFilterRequest filter = new TaskFilterRequest();
         filter.setSearch(search);
         filter.setProjectId(projectId);
@@ -62,11 +49,8 @@ public class TaskController {
         filter.setReporterId(reporterId);
         filter.setPriorities(priorities);
         filter.setTypes(types);
-        filter.setLabels(labels);
-        filter.setSprint(sprint);
         filter.setDueDateFrom(dueDateFrom);
         filter.setDueDateTo(dueDateTo);
-        filter.setCustomFields(onlyCustomFields != null && !onlyCustomFields.isEmpty() ? onlyCustomFields : null);
         filter.setSortBy(sortBy);
         filter.setSortDirection(sortDirection);
         filter.setPage(page);

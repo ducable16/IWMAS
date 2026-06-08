@@ -8,7 +8,6 @@ import org.springframework.data.jpa.domain.Specification;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class TaskSpecification {
 
@@ -52,37 +51,12 @@ public class TaskSpecification {
                 predicates.add(root.get("type").in(filter.getTypes()));
             }
 
-            if (filter.getSprint() != null && !filter.getSprint().isBlank()) {
-                predicates.add(cb.equal(root.get("sprint"), filter.getSprint()));
-            }
-
             if (filter.getDueDateFrom() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("dueDate"), filter.getDueDateFrom()));
             }
 
             if (filter.getDueDateTo() != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("dueDate"), filter.getDueDateTo()));
-            }
-
-            if (filter.getLabels() != null && !filter.getLabels().isEmpty()) {
-                SetJoin<Task, String> labelsJoin = root.joinSet("labels", JoinType.INNER);
-                predicates.add(labelsJoin.in(filter.getLabels()));
-                if (query.getResultType() != Long.class) {
-                    query.distinct(true);
-                }
-            }
-
-            if (filter.getCustomFields() != null && !filter.getCustomFields().isEmpty()) {
-                for (Map.Entry<String, String> entry : filter.getCustomFields().entrySet()) {
-                    MapJoin<Task, String, String> cfJoin = root.joinMap("customFields", JoinType.INNER);
-                    predicates.add(cb.and(
-                            cb.equal(cfJoin.key(), entry.getKey()),
-                            cb.equal(cfJoin.value(), entry.getValue())
-                    ));
-                }
-                if (query.getResultType() != Long.class) {
-                    query.distinct(true);
-                }
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
