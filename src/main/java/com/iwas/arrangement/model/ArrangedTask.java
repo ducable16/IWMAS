@@ -8,7 +8,6 @@ package com.iwas.arrangement.model;
  *
  * @param taskId                  task identifier
  * @param position                0-based slot in the sequence
- * @param priorityIndex           {@code Iⱼ(t)} at the moment this task was chosen
  * @param slackHours              {@code dⱼ - pⱼ - t} at selection (negative = overdue/at risk)
  * @param projectedStartHours     work-hours from {@code t0} until this task starts
  * @param projectedFinishHours    work-hours from {@code t0} until this task finishes
@@ -16,7 +15,7 @@ package com.iwas.arrangement.model;
  * @param estimateDefaulted       true when the estimate was missing and a floor was used
  * @param reason                  human-readable explanation (value density + urgency)
  */
-public record ArrangedTask(Long taskId, int position, double priorityIndex, double slackHours,
+public record ArrangedTask(Long taskId, int position, double slackHours,
                            double projectedStartHours, double projectedFinishHours,
                            double projectedTardinessHours, boolean estimateDefaulted,
                            String reason) {

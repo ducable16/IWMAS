@@ -84,7 +84,6 @@ public class TaskArrangementService {
                     task.getTitle(),
                     a.position(),
                     task.getPriority(),
-                    a.priorityIndex(),
                     a.slackHours(),
                     sched != null ? sched.projectedStart() : null,
                     sched != null ? sched.projectedFinish() : null,
@@ -118,9 +117,8 @@ public class TaskArrangementService {
 
         Task task = byId(lane.workable()).get(next.get().id());
         double pAverage = TardinessArranger.meanProcessing(eligible, config);
-        double index = AtcIndex.compute(next.get(), 0.0, pAverage, config);
         return new NextTaskResponse(projectId, assigneeId, false,
-                task.getId(), task.getTitle(), task.getPriority(), index,
+                task.getId(), task.getTitle(), task.getPriority(),
                 reasonFor(task, today, orderingCap, config, pAverage));
     }
 

@@ -57,7 +57,7 @@ public class TardinessArranger {
             double tardiness = best.dueHours() != null
                     ? Math.max(0.0, finish - best.dueHours()) : 0.0;
 
-            result.add(new ArrangedTask(best.id(), position++, bestIndex, slack,
+            result.add(new ArrangedTask(best.id(), position++, slack,
                     start, finish, tardiness, best.processingHours() <= 0.0,
                     buildReason(best, config, slack, pAverage)));
             remaining.remove(best);

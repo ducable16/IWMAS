@@ -9,9 +9,9 @@ import com.iwas.task.enums.TaskPriority;
  */
 public record NextTaskResponse(Long projectId, Long assigneeId, boolean queueEmpty,
                                Long taskId, String title, TaskPriority priority,
-                               double priorityIndex, String reason) {
+                               String reason) {
 
     public static NextTaskResponse empty(Long projectId, Long assigneeId) {
-        return new NextTaskResponse(projectId, assigneeId, true, null, null, null, 0.0, null);
+        return new NextTaskResponse(projectId, assigneeId, true, null, null, null, null);
     }
 }

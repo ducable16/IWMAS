@@ -20,7 +20,7 @@ public record ArrangeResponse(Long projectId, Long assigneeId,
      * workload simulator when the lane has capacity.
      */
     public record Item(Long taskId, String title, int position, TaskPriority priority,
-                       double priorityIndex, double slackHours,
+                       double slackHours,
                        LocalDate projectedStart, LocalDate projectedFinish,
                        double projectedTardinessHours, long lateByWorkdays, boolean willSlip,
                        boolean estimateDefaulted, String reason) {
