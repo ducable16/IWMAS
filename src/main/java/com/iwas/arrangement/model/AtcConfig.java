@@ -6,18 +6,50 @@ import com.iwas.task.enums.TaskPriority;
 import java.util.EnumMap;
 import java.util.Map;
 
-/**
- * Immutable, fully-resolved snapshot of the ATC parameters used for a single
- * {@code arrange} call. Built from {@link AtcProperties} and optionally
- * overridden per request (so a grid search / sensitivity analysis can sweep
- * {@code k} and the weights without touching configuration).
- */
-public record AtcConfig(Map<TaskPriority, Double> weights, double k,
-                        double minEstimateHours, TaskPriority priorityFallback) {
+public class AtcConfig {
 
-    public static AtcConfig from(AtcProperties props) {
-        return new AtcConfig(new EnumMap<>(props.getWeights()), props.getK(),
+    private static AtcConfig defaultConfig;
+
+    private final Map<TaskPriority, Double> weights;
+    private final double k;
+    private final double minEstimateHours;
+    private final TaskPriority priorityFallback;
+
+    public AtcConfig(Map<TaskPriority, Double> weights, double k,
+                     double minEstimateHours, TaskPriority priorityFallback) {
+        this.weights = weights;
+        this.k = k;
+        this.minEstimateHours = minEstimateHours;
+        this.priorityFallback = priorityFallback;
+    }
+
+    public static AtcConfig getDefault() {
+        if (defaultConfig == null) {
+            throw new IllegalStateException(
+                    "AtcConfig.defaultConfig is not initialized yet — accessed before Spring startup completed");
+        }
+        return defaultConfig;
+    }
+
+    public static void initialize(AtcProperties props) {
+        defaultConfig = new AtcConfig(new EnumMap<>(props.getWeights()), props.getK(),
                 props.getMinEstimateHours(), props.getPriorityFallback());
+    }
+
+    public Map<TaskPriority, Double> weights() {
+        return weights;
+    }
+
+    public double k() {
+        return k;
+    }
+
+    public double minEstimateHours() {
+        return minEstimateHours;
+    }
+
+    public TaskPriority priorityFallback() {
+        return priorityFallback;
     }
 
     /**

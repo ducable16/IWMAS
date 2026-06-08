@@ -30,7 +30,7 @@ public class TardinessArranger {
         List<ArrangedTask> result = new ArrayList<>();
         if (tasks == null || tasks.isEmpty()) return result;
 
-        double pBar = meanProcessing(tasks, config);
+        double pAverage = meanProcessing(tasks, config);
         List<AtcTask> remaining = new ArrayList<>(tasks);
         double t = 0.0;
         int position = 0;
@@ -39,14 +39,13 @@ public class TardinessArranger {
             AtcTask best = null;
             double bestIndex = Double.NEGATIVE_INFINITY;
             for (AtcTask candidate : remaining) {
-                double index = AtcIndex.compute(candidate, t, pBar, config);
+                double index = AtcIndex.compute(candidate, t, pAverage, config);
                 if (best == null || index > bestIndex + AtcIndex.EPS) {
                     best = candidate;
                     bestIndex = index;
                 } else if (index > bestIndex - AtcIndex.EPS) {
-                    // Within EPS — fall back to the deterministic tie-break.
                     best = AtcTieBreaker.preferred(best, candidate);
-                    bestIndex = AtcIndex.compute(best, t, pBar, config);
+                    bestIndex = AtcIndex.compute(best, t, pAverage, config);
                 }
             }
 
@@ -60,7 +59,7 @@ public class TardinessArranger {
 
             result.add(new ArrangedTask(best.id(), position++, bestIndex, slack,
                     start, finish, tardiness, best.processingHours() <= 0.0,
-                    buildReason(best, config, slack, pBar)));
+                    buildReason(best, config, slack, pAverage)));
             remaining.remove(best);
         }
         return result;
@@ -79,7 +78,7 @@ public class TardinessArranger {
         return mean <= 0.0 ? 1.0 : mean;
     }
 
-    private static String buildReason(AtcTask task, AtcConfig config, double slack, double pBar) {
+    private static String buildReason(AtcTask task, AtcConfig config, double slack, double pAverage) {
         double valueDensity = config.weightOf(task.priority()) / AtcIndex.processing(task, config);
         String urgencyNote;
         if (task.dueHours() == null) {
@@ -87,7 +86,7 @@ public class TardinessArranger {
         } else if (slack <= 0) {
             urgencyNote = String.format(Locale.US, "maximum urgency (slack=%.1fh ≤ 0)", slack);
         } else {
-            double urgency = AtcIndex.urgency(slack, pBar, config);
+            double urgency = AtcIndex.urgency(slack, pAverage, config);
             urgencyNote = String.format(Locale.US, "%.1fh slack remaining (urgency factor=%.2f)", slack, urgency);
         }
         return String.format(Locale.US, "value density w/p=%.2f; %s", valueDensity, urgencyNote);

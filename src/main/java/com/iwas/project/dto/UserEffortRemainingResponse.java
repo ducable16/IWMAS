@@ -15,13 +15,10 @@ public class UserEffortRemainingResponse {
     private LocalDate queryStart;
     private LocalDate queryEnd;
 
-    /** Peak concurrent allocation within the query period. */
     private int peakAllocatedPercent;
 
-    /** 100 - peakAllocatedPercent; minimum 0. */
     private int remainingPercent;
 
-    /** Projects whose timeline overlaps the query period and contribute to the peak. */
     private List<AllocationEntry> overlappingAllocations;
 
     /**

@@ -2,6 +2,7 @@ package com.iwas.workload.service;
 
 import com.iwas.arrangement.config.AtcProperties;
 import com.iwas.arrangement.core.TardinessArranger;
+import com.iwas.arrangement.model.AtcConfig;
 import com.iwas.notification.service.NotificationService;
 import com.iwas.project.entity.Project;
 import com.iwas.project.entity.ProjectMember;
@@ -19,6 +20,7 @@ import com.iwas.workload.dto.MemberWorkloadResponse;
 import com.iwas.workload.enums.WorkloadLevel;
 import com.iwas.workload.repository.BurnoutLogRepository;
 import com.iwas.workload.repository.WorkloadSnapshotRepository;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -52,9 +54,13 @@ class WorkloadServiceTest {
     @Mock NotificationService notificationService;
     @Spy ScheduleSimulator scheduleSimulator = new ScheduleSimulator();
     @Spy TardinessArranger tardinessArranger = new TardinessArranger();
-    @Spy AtcProperties atcProperties = new AtcProperties();
 
     @InjectMocks WorkloadService service;
+
+    @BeforeAll
+    static void initAtcConfig() {
+        AtcConfig.initialize(new AtcProperties());
+    }
 
     private static final long USER_ID = 1L;
     private static final long PROJECT_ID = 100L;

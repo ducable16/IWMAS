@@ -1,6 +1,5 @@
 package com.iwas.arrangement.service;
 
-import com.iwas.arrangement.config.AtcProperties;
 import com.iwas.arrangement.core.AtcDispatcher;
 import com.iwas.arrangement.core.AtcIndex;
 import com.iwas.arrangement.core.AtcTaskMapper;
@@ -58,14 +57,13 @@ public class TaskArrangementService {
     private final ScheduleSimulator scheduleSimulator;
     private final TardinessArranger arranger;
     private final AtcDispatcher dispatcher;
-    private final AtcProperties properties;
 
     /** Static arrangement — suggested execution order for the lane. */
     @Transactional(readOnly = true)
     public ArrangeResponse arrangeLane(Long projectId, Long assigneeId,
                                        Double kOverride, Map<TaskPriority, Double> weightOverrides) {
         Lane lane = loadLane(projectId, assigneeId);
-        AtcConfig config = AtcConfig.from(properties).withOverrides(kOverride, weightOverrides);
+        AtcConfig config = AtcConfig.getDefault().withOverrides(kOverride, weightOverrides);
         LocalDate today = LocalDate.now();
         double orderingCap = lane.dailyCap() > 0 ? lane.dailyCap() : DAILY_HOURS;
 
@@ -108,7 +106,7 @@ public class TaskArrangementService {
         Lane lane = loadLane(projectId, assigneeId);
         if (lane.workable().isEmpty()) return NextTaskResponse.empty(projectId, assigneeId);
 
-        AtcConfig config = AtcConfig.from(properties).withOverrides(kOverride, weightOverrides);
+        AtcConfig config = AtcConfig.getDefault().withOverrides(kOverride, weightOverrides);
         LocalDate today = LocalDate.now();
         double orderingCap = lane.dailyCap() > 0 ? lane.dailyCap() : DAILY_HOURS;
 
@@ -119,11 +117,11 @@ public class TaskArrangementService {
         if (next.isEmpty()) return NextTaskResponse.empty(projectId, assigneeId);
 
         Task task = byId(lane.workable()).get(next.get().id());
-        double pBar = TardinessArranger.meanProcessing(eligible, config);
-        double index = AtcIndex.compute(next.get(), 0.0, pBar, config);
+        double pAverage = TardinessArranger.meanProcessing(eligible, config);
+        double index = AtcIndex.compute(next.get(), 0.0, pAverage, config);
         return new NextTaskResponse(projectId, assigneeId, false,
                 task.getId(), task.getTitle(), task.getPriority(), index,
-                reasonFor(task, today, orderingCap, config, pBar));
+                reasonFor(task, today, orderingCap, config, pAverage));
     }
 
     // ─── lane loading ─────────────────────────────────────────────────────────
@@ -196,7 +194,7 @@ public class TaskArrangementService {
     }
 
     private static String reasonFor(Task task, LocalDate today, double cap,
-                                    AtcConfig config, double pBar) {
+                                    AtcConfig config, double pAverage) {
         AtcTask atc = AtcTaskMapper.from(task, today, cap);
         double slack = AtcIndex.slack(atc, 0.0, config);
         double valueDensity = config.weightOf(task.getPriority()) / AtcIndex.processing(atc, config);

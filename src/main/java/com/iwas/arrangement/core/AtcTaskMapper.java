@@ -18,12 +18,12 @@ public final class AtcTaskMapper {
     }
 
     /**
-     * @param t0       reference instant (today) — the deadline runway is measured from here
+     * @param today       reference instant (today) — the deadline runway is measured from here
      * @param dailyCap the lane's daily capacity in hours (8h × allocation%)
      */
-    public static AtcTask from(Task task, LocalDate t0, double dailyCap) {
+    public static AtcTask from(Task task, LocalDate today, double dailyCap) {
         double p = processingHours(task);
-        Double d = CapacityHours.dueHours(t0, task.getDueDate(), dailyCap);
+        Double d = CapacityHours.dueHours(today, task.getDueDate(), dailyCap);
         return new AtcTask(task.getId(), task.getPriority(), p, d);
     }
 

@@ -37,20 +37,20 @@ public final class AtcIndex {
     }
 
     /** Urgency factor {@code exp(-max(0, slack)/(k·p̄))} ∈ (0, 1]. */
-    public static double urgency(double slack, double pBar, AtcConfig config) {
+    public static double urgency(double slack, double pAverage, AtcConfig config) {
         if (slack <= 0.0) return 1.0;
-        return Math.exp(-slack / (config.k() * pBar));
+        return Math.exp(-slack / (config.k() * pAverage));
     }
 
     /**
      * Priority index {@code Iⱼ(t)} for one task at elapsed time {@code t}.
      *
-     * @param pBar mean processing time over the candidate set (static; guarded ≥ 1)
+     * @param pAverage mean processing time over the candidate set (static; guarded ≥ 1)
      */
-    public static double compute(AtcTask task, double t, double pBar, AtcConfig config) {
+    public static double compute(AtcTask task, double t, double pAverage, AtcConfig config) {
         double w = config.weightOf(task.priority());
         double p = processing(task, config);
-        double urgency = urgency(slack(task, t, config), pBar, config);
+        double urgency = urgency(slack(task, t, config), pAverage, config);
         return (w / p) * urgency;
     }
 }

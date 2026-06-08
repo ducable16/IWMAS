@@ -25,15 +25,15 @@ class AtcIndexTest {
     @Test
     void matchesWorkedExampleFromSpec() {
         AtcConfig config = config();
-        double pBar = (4 + 2 + 1) / 3.0; // 2.333
+        double pAverage = (4 + 2 + 1) / 3.0; // 2.333
 
         AtcTask a = new AtcTask(1L, TaskPriority.CRITICAL, 4, 6.0);
         AtcTask b = new AtcTask(2L, TaskPriority.HIGH, 2, 3.0);
         AtcTask c = new AtcTask(3L, TaskPriority.LOW, 1, 10.0);
 
-        assertEquals(1.303, AtcIndex.compute(a, 0, pBar, config), 0.01);
-        assertEquals(1.614, AtcIndex.compute(b, 0, pBar, config), 0.01);
-        assertEquals(0.145, AtcIndex.compute(c, 0, pBar, config), 0.01);
+        assertEquals(1.303, AtcIndex.compute(a, 0, pAverage, config), 0.01);
+        assertEquals(1.614, AtcIndex.compute(b, 0, pAverage, config), 0.01);
+        assertEquals(0.145, AtcIndex.compute(c, 0, pAverage, config), 0.01);
     }
 
     @Test

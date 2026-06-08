@@ -14,11 +14,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * One required-skill constraint: the subject must own {@code skillId} at {@code minLevel}
- * or higher. A {@code null} {@code minLevel} means "owns the skill, any level". Shared by
- * global user search and project-scoped member search.
- */
 @Data
 @Builder
 @NoArgsConstructor

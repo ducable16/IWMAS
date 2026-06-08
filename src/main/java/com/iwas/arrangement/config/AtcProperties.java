@@ -1,6 +1,8 @@
 package com.iwas.arrangement.config;
 
+import com.iwas.arrangement.model.AtcConfig;
 import com.iwas.task.enums.TaskPriority;
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +25,11 @@ public class AtcProperties {
     private TaskPriority priorityFallback = TaskPriority.LOW;
 
     private Map<TaskPriority, Double> weights = defaultWeights();
+
+    @PostConstruct
+    void initDefault() {
+        AtcConfig.initialize(this);
+    }
 
     private static Map<TaskPriority, Double> defaultWeights() {
         Map<TaskPriority, Double> w = new EnumMap<>(TaskPriority.class);

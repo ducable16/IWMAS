@@ -1,6 +1,5 @@
 package com.iwas.workload.service;
 
-import com.iwas.arrangement.config.AtcProperties;
 import com.iwas.arrangement.core.AtcTaskMapper;
 import com.iwas.arrangement.core.TardinessArranger;
 import com.iwas.arrangement.model.AtcConfig;
@@ -76,7 +75,6 @@ public class WorkloadService {
     private final NotificationService notificationService;
     private final ScheduleSimulator scheduleSimulator;
     private final TardinessArranger tardinessArranger;
-    private final AtcProperties atcProperties;
 
     private static final double DEFAULT_DAILY_HOURS = 8.0;
     private static final BigDecimal TIGHT_THRESHOLD = BigDecimal.valueOf(85);
@@ -163,7 +161,7 @@ public class WorkloadService {
         if (workable.isEmpty()) return List.of();
         double cap = dailyCap != null ? dailyCap.doubleValue() : 0.0;
         LocalDate today = LocalDate.now();
-        AtcConfig config = AtcConfig.from(atcProperties);
+        AtcConfig config = AtcConfig.getDefault();
         List<AtcTask> atcTasks = workable.stream()
                 .map(t -> AtcTaskMapper.from(t, today, cap))
                 .toList();
