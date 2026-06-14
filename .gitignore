@@ -32,5 +32,17 @@ build/
 ### VS Code ###
 .vscode/
 
+### Claude Code ###
+.claude/
+
+### Claude Code ###
+.claude/
+
 ## docs ##
 docs/
+api-docs/
+
+## markdown (ignore tất cả .md, trừ README) ##
+*.md
+!README.md
+!**/README.md

@@ -17,8 +17,9 @@ import java.util.Locale;
  *
  * <p>This produces a <em>high-quality heuristic</em> order, not a proven
  * optimum — the underlying problem is strongly NP-hard. The mean processing
- * time {@code p̄} that normalises the slack scale is computed once and held
- * static, as the original ATC rule prescribes.
+ * time {@code p̄} that normalises the slack scale is recomputed each step over
+ * the tasks still waiting, matching the original rule's "average processing
+ * time of the waiting jobs" (Rachamadugu &amp; Morton 1981).
  *
  * <p>Pure and deterministic: same input + config always yields the same order.
  */
@@ -30,12 +31,12 @@ public class TardinessArranger {
         List<ArrangedTask> result = new ArrayList<>();
         if (tasks == null || tasks.isEmpty()) return result;
 
-        double pAverage = meanProcessing(tasks, config);
         List<AtcTask> remaining = new ArrayList<>(tasks);
         double t = 0.0;
         int position = 0;
 
         while (!remaining.isEmpty()) {
+            double pAverage = meanProcessing(remaining, config);
             AtcTask best = null;
             double bestIndex = Double.NEGATIVE_INFINITY;
             for (AtcTask candidate : remaining) {

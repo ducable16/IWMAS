@@ -45,7 +45,7 @@ public final class AtcIndex {
     /**
      * Priority index {@code Iⱼ(t)} for one task at elapsed time {@code t}.
      *
-     * @param pAverage mean processing time over the candidate set (static; guarded ≥ 1)
+     * @param pAverage mean processing time over the tasks currently waiting (guarded ≥ 1)
      */
     public static double compute(AtcTask task, double t, double pAverage, AtcConfig config) {
         double w = config.weightOf(task.priority());

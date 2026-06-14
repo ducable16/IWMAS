@@ -54,7 +54,11 @@ class AtcValidationExperimentTest {
         double atcGap = 0, eddGap = 0, wsptGap = 0, randGap = 0;
         int counted = 0;
 
+        System.out.printf("ATC validation (n=%d, %d instances per tightness):%n", N, INSTANCES);
+        System.out.println("  tf    counted   ATC      EDD      WSPT     random");
         for (double tf : TIGHTNESS) {
+            double tfAtc = 0, tfEdd = 0, tfWspt = 0, tfRand = 0;
+            int tfCounted = 0;
             for (int i = 0; i < INSTANCES; i++) {
                 List<AtcTask> tasks = gen.generate(N, tf, RDD);
                 double opt = BruteForceSolver.optimum(tasks, config);
@@ -65,12 +69,20 @@ class AtcValidationExperimentTest {
                 double wspt = WeightedTardiness.objective(wsptOrder(tasks, config), config);
                 double rand = WeightedTardiness.objective(randomOrder(tasks, shuffleRng), config);
 
-                atcGap += (atc - opt) / opt;
-                eddGap += (edd - opt) / opt;
-                wsptGap += (wspt - opt) / opt;
-                randGap += (rand - opt) / opt;
-                counted++;
+                tfAtc += (atc - opt) / opt;
+                tfEdd += (edd - opt) / opt;
+                tfWspt += (wspt - opt) / opt;
+                tfRand += (rand - opt) / opt;
+                tfCounted++;
             }
+            System.out.printf("  %.1f   %4d     %.4f   %.4f   %.4f   %.4f%n",
+                    tf, tfCounted, tfAtc / tfCounted, tfEdd / tfCounted,
+                    tfWspt / tfCounted, tfRand / tfCounted);
+            atcGap += tfAtc;
+            eddGap += tfEdd;
+            wsptGap += tfWspt;
+            randGap += tfRand;
+            counted += tfCounted;
         }
 
         atcGap /= counted;
