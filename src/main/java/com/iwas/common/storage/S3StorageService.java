@@ -15,7 +15,6 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
-import software.amazon.awssdk.services.s3.model.PutBucketPolicyRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -25,13 +24,10 @@ import java.time.Duration;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MinioStorageService implements StorageService {
+public class S3StorageService implements StorageService {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
-
-    @Value("${app.storage.endpoint}")
-    private String endpoint;
 
     @Value("${app.storage.bucket}")
     private String bucket;
@@ -49,32 +45,6 @@ public class MinioStorageService implements StorageService {
             log.info("[Storage] Created bucket '{}'", bucket);
         } catch (Exception e) {
             log.warn("[Storage] Could not verify bucket '{}': {}", bucket, e.getMessage());
-        }
-        applyAvatarPublicPolicy();
-    }
-
-    private void applyAvatarPublicPolicy() {
-        String policy = """
-                {
-                  "Version": "2012-10-17",
-                  "Statement": [
-                    {
-                      "Effect": "Allow",
-                      "Principal": {"AWS": ["*"]},
-                      "Action": ["s3:GetObject"],
-                      "Resource": ["arn:aws:s3:::%s/avatars/*"]
-                    }
-                  ]
-                }
-                """.formatted(bucket);
-        try {
-            s3Client.putBucketPolicy(PutBucketPolicyRequest.builder()
-                    .bucket(bucket)
-                    .policy(policy)
-                    .build());
-            log.info("[Storage] Public read policy applied to avatars/*");
-        } catch (Exception e) {
-            log.warn("[Storage] Could not apply avatar public policy: {}", e.getMessage());
         }
     }
 
@@ -99,11 +69,8 @@ public class MinioStorageService implements StorageService {
 
     @Override
     public String getUrl(String key) {
-        if (key.startsWith("avatars/")) {
-            String url = endpoint + "/" + bucket + "/" + key;
-            log.info("[Storage] Get url '{}'", url);
-            return url;
-        }
+        // Mọi object (gồm cả avatar) đều trả presigned URL có thời hạn => bucket private hoàn toàn,
+        // không cần tắt Block Public Access. URL được sinh mới mỗi lần đọc (DB/ES chỉ lưu key).
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                 .signatureDuration(Duration.ofMinutes(presignedUrlExpirationMinutes))
                 .getObjectRequest(GetObjectRequest.builder()

@@ -7,6 +7,7 @@ import com.iwas.search.dto.ProjectSearchResult;
 import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
+import com.iwas.search.dto.UserIndexCommand;
 import com.iwas.search.dto.UserSearchResult;
 import com.iwas.search.entity.ProjectSearchDocument;
 import com.iwas.search.entity.UserSearchDocument;
@@ -149,8 +150,8 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     }
 
     @Override
-    public void indexUser(UserSearchResult user) {
-        List<UserSearchDocument.SkillRef> skills = employeeSkillRepository.findByUserId(user.getId()).stream()
+    public void indexUser(UserIndexCommand cmd) {
+        List<UserSearchDocument.SkillRef> skills = employeeSkillRepository.findByUserId(cmd.getId()).stream()
                 .map(es -> UserSearchDocument.SkillRef.builder()
                         .skillId(es.getSkillId())
                         .levelRank(es.getLevel().ordinal())
@@ -158,12 +159,12 @@ public class ElasticsearchAdapter implements ElasticsearchService {
                 .collect(Collectors.toList());
 
         UserSearchDocument doc = UserSearchDocument.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .position(user.getPosition())
-                .avatarId(user.getAvatarUrl())
-                .role(user.getRole())
+                .id(cmd.getId())
+                .email(cmd.getEmail())
+                .fullName(cmd.getFullName())
+                .position(cmd.getPosition())
+                .avatarId(cmd.getAvatarId())
+                .role(cmd.getRole())
                 .isActive(true)
                 .skills(skills)
                 .build();

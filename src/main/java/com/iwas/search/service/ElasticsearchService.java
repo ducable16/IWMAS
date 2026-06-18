@@ -4,6 +4,7 @@ import com.iwas.search.dto.ProjectSearchResult;
 import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
+import com.iwas.search.dto.UserIndexCommand;
 import com.iwas.search.dto.UserSearchResult;
 
 import java.util.List;
@@ -15,7 +16,7 @@ public interface ElasticsearchService {
     SearchResponse<UserSearchResult> searchUsers(SearchRequest request);
     List<SuggestionItem> autocompleteUsers(String prefix, int topN);
     List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds);
-    void indexUser(UserSearchResult user);
+    void indexUser(UserIndexCommand command);
     void deleteUser(Long userId);
 
     // --- Project ---

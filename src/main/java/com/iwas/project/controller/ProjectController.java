@@ -59,6 +59,13 @@ public class ProjectController {
         return projectService.updateProject(id, request);
     }
 
+    @PatchMapping("/{id}/manager")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    public ProjectResponse changeManager(@PathVariable Long id,
+                                         @Valid @RequestBody ProjectManagerChangeRequest request) {
+        return projectService.changeManager(id, request);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)

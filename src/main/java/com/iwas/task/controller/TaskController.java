@@ -115,8 +115,8 @@ public class TaskController {
     }
 
     @GetMapping("/{id}/history")
-    public List<TaskStatusHistoryResponse> getStatusHistory(@PathVariable Long id) {
-        return taskService.getStatusHistory(id);
+    public List<TaskActivityResponse> getHistory(@PathVariable Long id) {
+        return taskService.getTaskActivity(id);
     }
 
     @GetMapping("/{id}/assignee-candidates")

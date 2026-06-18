@@ -8,7 +8,10 @@ import com.iwas.project.service.ProjectService;
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.task.dto.TaskAttachmentResponse;
 import com.iwas.task.entity.Task;
+import com.iwas.task.entity.TaskActivity;
 import com.iwas.task.entity.TaskAttachment;
+import com.iwas.task.enums.TaskActivityType;
+import com.iwas.task.repository.TaskActivityRepository;
 import com.iwas.task.repository.TaskAttachmentRepository;
 import com.iwas.task.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +28,7 @@ public class TaskAttachmentService {
 
     private final TaskRepository taskRepository;
     private final TaskAttachmentRepository attachmentRepository;
+    private final TaskActivityRepository taskActivityRepository;
     private final StorageService storageService;
     private final FileValidator fileValidator;
     private final ProjectService projectService;
@@ -56,7 +60,9 @@ public class TaskAttachmentService {
         attachment.setContentType(file.getContentType());
         attachment.setUploadedBy(authenticatedUserResolver.currentUserId());
 
-        return toResponse(attachmentRepository.save(attachment));
+        TaskAttachment saved = attachmentRepository.save(attachment);
+        recordActivity(taskId, TaskActivityType.ATTACHMENT_ADDED, null, saved.getFileName());
+        return toResponse(saved);
     }
 
     @Transactional
@@ -78,6 +84,17 @@ public class TaskAttachmentService {
         attachment.setIsDeleted(true);
         attachmentRepository.save(attachment);
         storageService.delete(attachment.getFileKey());
+        recordActivity(taskId, TaskActivityType.ATTACHMENT_REMOVED, attachment.getFileName(), null);
+    }
+
+    private void recordActivity(Long taskId, TaskActivityType action, String oldValue, String newValue) {
+        TaskActivity activity = new TaskActivity();
+        activity.setTaskId(taskId);
+        activity.setActorId(authenticatedUserResolver.currentUserId());
+        activity.setAction(action);
+        activity.setOldValue(oldValue);
+        activity.setNewValue(newValue);
+        taskActivityRepository.save(activity);
     }
 
     private TaskAttachmentResponse toResponse(TaskAttachment a) {

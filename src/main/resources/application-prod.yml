@@ -1,0 +1,14 @@
+# ============================================================================
+# Profile PROD — kích hoạt bằng: SPRING_PROFILES_ACTIVE=prod
+# Chỉ override những gì khác dev. Storage chuyển từ MinIO sang AWS S3 thật.
+# Các service khác (Postgres/Redis/RabbitMQ/ES) vẫn dùng localhost như app chính
+# vì trên EC2 chúng chạy local/qua docker-compose.slim.yml ở cùng máy.
+# ============================================================================
+app:
+  storage:
+    # KHÔNG đặt endpoint => SDK dùng endpoint mặc định của AWS S3.
+    # KHÔNG đặt access-key/secret-key => lấy từ IAM instance role gắn vào EC2.
+    region: ${AWS_REGION:ap-southeast-1}
+    bucket: ${S3_BUCKET:iwas-files}
+    path-style-access: false
+    presigned-url-expiration-minutes: 60

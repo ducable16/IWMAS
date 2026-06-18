@@ -180,6 +180,7 @@
 	</dependencies>
 
 	<build>
+		<finalName>iwas</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

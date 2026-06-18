@@ -9,6 +9,4 @@ public class TaskStatusUpdateRequest {
 
     @NotNull(message = "Status is required")
     private TaskStatus status;
-
-    private String note;
 }

@@ -14,14 +14,18 @@ import com.iwas.skill.repository.EmployeeSkillRepository;
 import com.iwas.skill.repository.SkillRepository;
 import com.iwas.task.dto.*;
 import com.iwas.task.entity.Task;
+import com.iwas.task.entity.TaskActivity;
 import com.iwas.task.entity.TaskSkillRequirement;
-import com.iwas.task.entity.TaskStatusHistory;
+import com.iwas.task.enums.TaskActivityType;
+import com.iwas.task.enums.TaskPriority;
 import com.iwas.task.enums.TaskStatus;
+import com.iwas.task.enums.TaskType;
+import com.iwas.task.repository.TaskActivityRepository;
 import com.iwas.task.repository.TaskRepository;
 import com.iwas.task.repository.TaskSkillRequirementRepository;
 import com.iwas.task.repository.TaskSpecification;
-import com.iwas.task.repository.TaskStatusHistoryRepository;
 import com.iwas.user.dto.UserMeResponse;
+import com.iwas.user.dto.UserPublicView;
 import com.iwas.user.entity.User;
 import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
@@ -29,7 +33,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,7 +55,7 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final TaskSkillRequirementRepository taskSkillRequirementRepository;
-    private final TaskStatusHistoryRepository taskStatusHistoryRepository;
+    private final TaskActivityRepository taskActivityRepository;
     private final SkillRepository skillRepository;
     private final EmployeeSkillRepository employeeSkillRepository;
     private final UserRepository userRepository;
@@ -202,6 +205,9 @@ public class TaskService {
             saveSkillRequirements(task.getId(), request.getSkillRequirements());
         }
 
+        taskActivityRepository.save(newActivity(task.getId(), reporterId,
+                TaskActivityType.TASK_CREATED, null, null));
+
         if (task.getAssigneeId() != null) {
             notificationService.send(
                     task.getAssigneeId(), NotificationType.TASK_ASSIGNED,
@@ -217,15 +223,39 @@ public class TaskService {
     public TaskResponse updateTask(Long id, TaskRequest request) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
-        validateAssignee(task.getProjectId(), task.getAssigneeId());
+        Long actor = authenticatedUserResolver.currentUserId();
+
+        // Snapshot before applyRequest so we can diff into the activity feed.
+        String oldTitle = task.getTitle();
+        String oldDescription = task.getDescription();
+        TaskType oldType = task.getType();
+        TaskPriority oldPriority = task.getPriority();
+        BigDecimal oldEstimate = task.getEstimatedHours();
         Long oldAssigneeId = task.getAssigneeId();
+        LocalDate oldStart = task.getStartDate();
+        LocalDate oldDue = task.getDueDate();
+
         applyRequest(task, request);
+        validateAssignee(task.getProjectId(), task.getAssigneeId());
         validateAssigneeSkills(task.getAssigneeId(), id, request.getSkillRequirements());
         task = taskRepository.save(task);
 
         if (request.getSkillRequirements() != null) {
             taskSkillRequirementRepository.deleteByTaskId(id);
             saveSkillRequirements(task.getId(), request.getSkillRequirements());
+        }
+
+        List<TaskActivity> changes = new ArrayList<>();
+        addChange(changes, id, actor, TaskActivityType.TITLE_CHANGED, oldTitle, task.getTitle());
+        addChange(changes, id, actor, TaskActivityType.DESCRIPTION_CHANGED, oldDescription, task.getDescription());
+        addChange(changes, id, actor, TaskActivityType.TYPE_CHANGED, oldType, task.getType());
+        addChange(changes, id, actor, TaskActivityType.PRIORITY_CHANGED, oldPriority, task.getPriority());
+        addEstimateChange(changes, id, actor, oldEstimate, task.getEstimatedHours());
+        addChange(changes, id, actor, TaskActivityType.ASSIGNEE_CHANGED, oldAssigneeId, task.getAssigneeId());
+        addChange(changes, id, actor, TaskActivityType.START_DATE_CHANGED, oldStart, task.getStartDate());
+        addChange(changes, id, actor, TaskActivityType.DUE_DATE_CHANGED, oldDue, task.getDueDate());
+        if (!changes.isEmpty()) {
+            taskActivityRepository.saveAll(changes);
         }
 
         Long newAssigneeId = task.getAssigneeId();
@@ -240,10 +270,7 @@ public class TaskService {
     }
 
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "kanbanBoard", allEntries = true),
-            @CacheEvict(value = "taskStatusHistory", key = "#id")
-    })
+    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request, Long changedById) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
@@ -252,13 +279,9 @@ public class TaskService {
             throw new AppException(ErrorCode.TASK_INVALID_STATUS_TRANSITION);
         }
 
-        TaskStatusHistory history = new TaskStatusHistory();
-        history.setTaskId(id);
-        history.setOldStatus(task.getStatus());
-        history.setNewStatus(request.getStatus());
-        history.setChangedBy(changedById);
-        history.setNote(request.getNote());
-        taskStatusHistoryRepository.save(history);
+        taskActivityRepository.save(newActivity(id, changedById, TaskActivityType.STATUS_CHANGED,
+                task.getStatus() == null ? null : task.getStatus().name(),
+                request.getStatus().name()));
 
         task.setStatus(request.getStatus());
         if (request.getStatus() == TaskStatus.DONE) {
@@ -288,9 +311,20 @@ public class TaskService {
     public TaskResponse updateTaskDates(Long id, TaskDateUpdateRequest request) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
+        Long actor = authenticatedUserResolver.currentUserId();
 
+        LocalDate oldStart = task.getStartDate();
+        LocalDate oldDue = task.getDueDate();
         resolveAndApplyDates(task, request.getStartDate(), request.getDueDate());
         task = taskRepository.save(task);
+
+        List<TaskActivity> changes = new ArrayList<>();
+        addChange(changes, id, actor, TaskActivityType.START_DATE_CHANGED, oldStart, task.getStartDate());
+        addChange(changes, id, actor, TaskActivityType.DUE_DATE_CHANGED, oldDue, task.getDueDate());
+        if (!changes.isEmpty()) {
+            taskActivityRepository.saveAll(changes);
+        }
+
         return toResponse(task, getSkillRequirements(task.getId()));
     }
 
@@ -298,29 +332,49 @@ public class TaskService {
     @CacheEvict(value = "kanbanBoard", allEntries = true)
     public void deleteTask(Long id) {
         Task task = findTask(id);
+        Long actor = authenticatedUserResolver.currentUserId();
         task.setIsDeleted(true);
         taskRepository.save(task);
+        taskActivityRepository.save(newActivity(id, actor, TaskActivityType.TASK_DELETED, null, null));
     }
 
-    // Access-check wrapper — delegates to the cached implementation via proxy
-    public List<TaskStatusHistoryResponse> getStatusHistory(Long taskId) {
+    /**
+     * Unified activity/history feed for a task — status, field edits, and
+     * attachment events — in chronological order. Replaces the old
+     * status-only history.
+     */
+    public List<TaskActivityResponse> getTaskActivity(Long taskId) {
         Task task = findTask(taskId);
         projectService.requireProjectAccess(task.getProjectId());
-        return self.getStatusHistoryCached(taskId);
-    }
 
-    @Cacheable(value = "taskStatusHistory", key = "#taskId")
-    public List<TaskStatusHistoryResponse> getStatusHistoryCached(Long taskId) {
-        return taskStatusHistoryRepository.findByTaskIdOrderByChangedAtAsc(taskId).stream()
-                .map(h -> TaskStatusHistoryResponse.builder()
-                        .id(h.getId())
-                        .oldStatus(h.getOldStatus())
-                        .newStatus(h.getNewStatus())
-                        .changedBy(h.getChangedBy())
-                        .note(h.getNote())
-                        .changedAt(h.getChangedAt())
-                        .build())
-                .toList();
+        List<TaskActivity> activities = taskActivityRepository.findByTaskIdOrderByCreatedAtAsc(taskId);
+        if (activities.isEmpty()) return Collections.emptyList();
+
+        Set<Long> userIds = new HashSet<>();
+        for (TaskActivity a : activities) {
+            userIds.add(a.getActorId());
+            if (a.getAction() == TaskActivityType.ASSIGNEE_CHANGED) {
+                addUserId(userIds, a.getOldValue());
+                addUserId(userIds, a.getNewValue());
+            }
+        }
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        return activities.stream().map(a -> {
+            TaskActivityResponse.TaskActivityResponseBuilder b = TaskActivityResponse.builder()
+                    .id(a.getId())
+                    .action(a.getAction())
+                    .oldValue(a.getOldValue())
+                    .newValue(a.getNewValue())
+                    .actor(userMapper.toPublicView(userMap.get(a.getActorId())))
+                    .createdAt(a.getCreatedAt());
+            if (a.getAction() == TaskActivityType.ASSIGNEE_CHANGED) {
+                b.oldUser(resolveUser(userMap, a.getOldValue()));
+                b.newUser(resolveUser(userMap, a.getNewValue()));
+            }
+            return b.build();
+        }).toList();
     }
 
     public List<CalendarDayResponse> getCalendarView(LocalDate from, LocalDate to, Long projectId) {
@@ -485,6 +539,57 @@ public class TaskService {
         return taskRepository.findById(id)
                 .filter(t -> !Boolean.TRUE.equals(t.getIsDeleted()))
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
+    }
+
+    // --- Activity-feed helpers ---
+
+    private TaskActivity newActivity(Long taskId, Long actorId, TaskActivityType action,
+                                     String oldValue, String newValue) {
+        TaskActivity a = new TaskActivity();
+        a.setTaskId(taskId);
+        a.setActorId(actorId);
+        a.setAction(action);
+        a.setOldValue(oldValue);
+        a.setNewValue(newValue);
+        return a;
+    }
+
+    /** Appends a change entry only when the value actually changed. */
+    private void addChange(List<TaskActivity> buf, Long taskId, Long actorId,
+                           TaskActivityType action, Object oldVal, Object newVal) {
+        if (Objects.equals(oldVal, newVal)) return;
+        buf.add(newActivity(taskId, actorId, action, str(oldVal), str(newVal)));
+    }
+
+    /** Estimate uses BigDecimal.compareTo so 2.0 and 2.00 are not reported as a change. */
+    private void addEstimateChange(List<TaskActivity> buf, Long taskId, Long actorId,
+                                   BigDecimal oldVal, BigDecimal newVal) {
+        boolean changed = (oldVal == null) != (newVal == null)
+                || (oldVal != null && oldVal.compareTo(newVal) != 0);
+        if (!changed) return;
+        buf.add(newActivity(taskId, actorId, TaskActivityType.ESTIMATE_CHANGED, str(oldVal), str(newVal)));
+    }
+
+    private static String str(Object v) {
+        return v == null ? null : v.toString();
+    }
+
+    private static void addUserId(Set<Long> set, String value) {
+        if (value == null || value.isBlank()) return;
+        try {
+            set.add(Long.parseLong(value));
+        } catch (NumberFormatException ignored) {
+            // not a user id — skip
+        }
+    }
+
+    private UserPublicView resolveUser(Map<Long, User> userMap, String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return userMapper.toPublicView(userMap.get(Long.parseLong(value)));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private void saveSkillRequirements(Long taskId, List<TaskSkillRequirementRequest> reqs) {

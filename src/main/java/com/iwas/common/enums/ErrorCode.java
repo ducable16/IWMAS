@@ -61,6 +61,7 @@ public enum ErrorCode {
     USER_OVER_ALLOCATED(4005, "User's peak concurrent allocation would exceed 100%", HttpStatus.CONFLICT),
     PROJECT_MEMBER_ALLOC_REQUIRED(4008, "Allocated effort percent is required", HttpStatus.BAD_REQUEST),
     PROJECT_MANAGER_IMMUTABLE(4009, "Project manager cannot be changed after creation", HttpStatus.CONFLICT),
+    PROJECT_MANAGER_UNCHANGED(4010, "New manager must be different from the current manager", HttpStatus.BAD_REQUEST),
 
     // --- 5xxx: Tasks ---
     TASK_NOT_FOUND(5001, "Task not found", HttpStatus.NOT_FOUND),

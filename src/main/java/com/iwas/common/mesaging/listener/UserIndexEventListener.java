@@ -1,7 +1,7 @@
 package com.iwas.common.mesaging.listener;
 
 import com.iwas.common.mesaging.event.UserIndexEvent;
-import com.iwas.search.dto.UserSearchResult;
+import com.iwas.search.dto.UserIndexCommand;
 import com.iwas.search.service.ElasticsearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,12 +20,12 @@ public class UserIndexEventListener {
     public void onMessage(UserIndexEvent event) {
         try {
             switch (event.getOp()) {
-                case UPSERT -> engine.indexUser(UserSearchResult.builder()
+                case UPSERT -> engine.indexUser(UserIndexCommand.builder()
                         .id(event.getUserId())
                         .email(event.getEmail())
                         .fullName(event.getFullName())
                         .position(event.getPosition())
-                        .avatarUrl(event.getAvatarId())
+                        .avatarId(event.getAvatarId())
                         .role(event.getRole())
                         .build());
                 case DELETE -> engine.deleteUser(event.getUserId());

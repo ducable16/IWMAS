@@ -245,6 +245,75 @@ public class ProjectService {
         return toProjectResponse(saved);
     }
 
+    /**
+     * Hands the project over to a new PM. Unlike {@link #updateProject} (where managerId is immutable),
+     * this dedicated flow also rebuilds the LEAD membership and reassigns work:
+     * <ol>
+     *   <li>The new manager joins as a fresh LEAD member with the requested effort allocation,
+     *       validated up-front (fail-fast) against their peak-concurrent capacity.</li>
+     *   <li>The outgoing manager is removed from the project (their LEAD membership is soft-deleted).</li>
+     *   <li>Every active task still assigned to the outgoing manager is reassigned to the new manager.</li>
+     * </ol>
+     * The new manager must not already be a member of the project.
+     */
+    @Transactional
+    public ProjectResponse changeManager(Long projectId, ProjectManagerChangeRequest request) {
+        Project project = findProject(projectId);
+        Long oldManagerId = project.getManagerId();
+        Long newManagerId = request.getNewManagerId();
+
+        if (newManagerId.equals(oldManagerId)) {
+            throw new AppException(ErrorCode.PROJECT_MANAGER_UNCHANGED);
+        }
+
+        userRepository.findById(newManagerId)
+                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        // The incoming PM always joins fresh — reject if they are already an active member.
+        projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, newManagerId)
+                .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
+
+        // Build + validate the new PM's LEAD membership first, mirroring createProject: any capacity
+        // failure rolls back before we touch the old manager, so the project never loses its PM.
+        ProjectMember newPmMember = new ProjectMember();
+        newPmMember.setProjectId(projectId);
+        newPmMember.setUserId(newManagerId);
+        newPmMember.setRoleInProject(ProjectRoleInProject.LEAD);
+        newPmMember.setAllocatedEffortPercent(request.getManagerAllocationPercent());
+        newPmMember.setJoinDate(project.getStartDate() != null ? project.getStartDate() : LocalDate.now());
+        checkAllocationLimit(newPmMember.getUserId(), newPmMember.getAllocatedEffortPercent(),
+                membershipStart(newPmMember, project), membershipEnd(newPmMember, project), null);
+
+        // Remove the outgoing manager from the project (soft-delete their membership).
+        projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, oldManagerId)
+                .ifPresent(pm -> {
+                    pm.setIsDeleted(true);
+                    projectMemberRepository.save(pm);
+                });
+
+        // Reassign the outgoing manager's still-active tasks to the new manager.
+        List<com.iwas.task.entity.Task> tasks =
+                taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, oldManagerId);
+        if (!tasks.isEmpty()) {
+            tasks.forEach(t -> t.setAssigneeId(newManagerId));
+            taskRepository.saveAll(tasks);
+        }
+
+        project.setManagerId(newManagerId);
+        Project saved = projectRepository.save(project);
+        projectMemberRepository.save(newPmMember);
+
+        projectIndexEventPublisher.publish(toUpsertEvent(saved));
+
+        notificationService.send(
+                newManagerId, NotificationType.PROJECT_ADDED,
+                NotificationMessages.projectAdded(project.getName()),
+                "PROJECT", projectId);
+
+        return toProjectResponse(saved);
+    }
+
     @Transactional
     public void deleteProject(Long id) {
         Project project = findProject(id);
