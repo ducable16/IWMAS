@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.Builder.Default;
 import com.iwas.skill.dto.RequiredSkill;
+import com.iwas.user.enums.UserRole;
 
 import java.util.List;
 
@@ -27,6 +28,9 @@ public class SearchRequest {
     /** Skill constraints; the user must satisfy ALL of them (AND). */
     @Default
     private List<RequiredSkill> requiredSkills = List.of();
+
+    /** Optional system-role filter. When set, only users with this {@link UserRole} match. */
+    private UserRole role;
 
     @Default
     @Min(0)

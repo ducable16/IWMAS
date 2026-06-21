@@ -17,6 +17,7 @@ import com.iwas.common.storage.StorageService;
 import com.iwas.search.service.ElasticsearchService;
 import com.iwas.skill.dto.RequiredSkill;
 import com.iwas.skill.repository.EmployeeSkillRepository;
+import com.iwas.user.enums.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -64,6 +65,9 @@ public class ElasticsearchAdapter implements ElasticsearchService {
                                 .query(request.getQuery())));
             }
             b.filter(f -> f.term(t -> t.field("isActive").value(true)));
+            if (request.getRole() != null) {
+                b.filter(f -> f.term(t -> t.field("role").value(request.getRole().name())));
+            }
             for (RequiredSkill rs : requiredSkills) {
                 b.filter(skillFilter(rs));
             }
@@ -100,11 +104,16 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     }
 
     @Override
-    public List<SuggestionItem> autocompleteUsers(String prefix, int topN) {
-        Query query = Query.of(q -> q.bool(b -> b
-                .should(s -> s.matchPhrasePrefix(p -> p.field("fullName").query(prefix)))
-                .should(s -> s.matchPhrasePrefix(p -> p.field("position").query(prefix)))
-                .filter(f -> f.term(t -> t.field("isActive").value(true)))));
+    public List<SuggestionItem> autocompleteUsers(String prefix, int topN, UserRole role) {
+        Query query = Query.of(q -> q.bool(b -> {
+            b.should(s -> s.matchPhrasePrefix(p -> p.field("fullName").query(prefix)))
+             .should(s -> s.matchPhrasePrefix(p -> p.field("position").query(prefix)))
+             .filter(f -> f.term(t -> t.field("isActive").value(true)));
+            if (role != null) {
+                b.filter(f -> f.term(t -> t.field("role").value(role.name())));
+            }
+            return b;
+        }));
 
         NativeQuery nq = NativeQuery.builder()
                 .withQuery(query)
@@ -122,11 +131,14 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     }
 
     @Override
-    public List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds) {
+    public List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds, UserRole role) {
         Query query = Query.of(q -> q.bool(b -> {
             b.should(s -> s.matchPhrasePrefix(p -> p.field("fullName").query(prefix)))
              .should(s -> s.matchPhrasePrefix(p -> p.field("position").query(prefix)))
              .filter(f -> f.term(t -> t.field("isActive").value(true)));
+            if (role != null) {
+                b.filter(f -> f.term(t -> t.field("role").value(role.name())));
+            }
             if (!excludeIds.isEmpty()) {
                 List<String> idStrings = excludeIds.stream().map(String::valueOf).toList();
                 b.mustNot(mn -> mn.ids(i -> i.values(idStrings)));

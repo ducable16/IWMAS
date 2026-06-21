@@ -7,6 +7,7 @@ import com.iwas.skill.dto.RequiredSkill;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.UserSearchResult;
 import com.iwas.search.service.SearchService;
+import com.iwas.user.enums.UserRole;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -32,14 +33,16 @@ public class SearchController {
     public AutocompleteResponse autocomplete(
             @RequestParam("q") @NotBlank String q,
             @RequestParam(value = "projectId", required = false) Long projectId,
-            @RequestParam(value = "excludeProjectId", required = false) Long excludeProjectId) {
-        return searchService.autocomplete(q, projectId, excludeProjectId);
+            @RequestParam(value = "excludeProjectId", required = false) Long excludeProjectId,
+            @RequestParam(value = "role", required = false) UserRole role) {
+        return searchService.autocomplete(q, projectId, excludeProjectId, role);
     }
 
     @GetMapping("/search")
     public SearchResponse<UserSearchResult> search(
             @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "requiredSkills", required = false) String requiredSkills,
+            @RequestParam(value = "role", required = false) UserRole role,
             @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
             @RequestParam(value = "size", defaultValue = "20") @Min(1) int size,
             @RequestParam(value = "sortBy", required = false) String sortBy,
@@ -47,6 +50,7 @@ public class SearchController {
         SearchRequest req = SearchRequest.builder()
                 .query(q)
                 .requiredSkills(RequiredSkill.parse(requiredSkills))
+                .role(role)
                 .page(page).size(size).sortBy(sortBy).sortDir(sortDir).build();
         return searchService.search(req);
     }

@@ -23,6 +23,7 @@ import com.iwas.skill.entity.EmployeeSkill;
 import com.iwas.skill.repository.EmployeeSkillRepository;
 import com.iwas.user.dto.UserMeResponse;
 import com.iwas.user.entity.User;
+import com.iwas.user.enums.UserRole;
 import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -183,16 +184,17 @@ public class ProjectService {
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
 
-        // Build the PM's LEAD membership and validate its effort first (fail-fast, before anything is
+        // Build the PM's PROJECT_MANAGER membership and validate its effort first (fail-fast, before anything is
         // persisted). The candidate window is the PM membership's own [joinDate, leaveDate] window
         // (joinDate = project start or today; leaveDate null -> project end). Throws
         // PROJECT_MEMBER_ALLOC_REQUIRED when null/<=0 and USER_OVER_ALLOCATED when over capacity; any
         // failure rolls back the whole transaction, so we never leave a project without its PM member.
         ProjectMember pmMember = new ProjectMember();
         pmMember.setUserId(request.getManagerId());
-        pmMember.setRoleInProject(ProjectRoleInProject.LEAD);
+        pmMember.setRoleInProject(ProjectRoleInProject.PROJECT_MANAGER);
         pmMember.setAllocatedEffortPercent(request.getManagerAllocationPercent());
         pmMember.setJoinDate(request.getStartDate() != null ? request.getStartDate() : LocalDate.now());
+        requireUserRoleFor(pmMember.getUserId(), ProjectRoleInProject.PROJECT_MANAGER);
         checkAllocationLimit(pmMember.getUserId(), pmMember.getAllocatedEffortPercent(),
                 membershipStart(pmMember, project), membershipEnd(pmMember, project), null);
 
@@ -210,7 +212,7 @@ public class ProjectService {
         project.setManagerId(request.getManagerId());
         Project saved = projectRepository.save(project);
 
-        // Atomically add the PM (managerId) as a LEAD member with the requested effort.
+        // Atomically add the PM (managerId) as a PROJECT_MANAGER member with the requested effort.
         pmMember.setProjectId(saved.getId());
         projectMemberRepository.save(pmMember);
 
@@ -229,7 +231,7 @@ public class ProjectService {
             }
         }
 
-        // Manager is immutable: the PM's LEAD membership + effort allocation are set atomically at
+        // Manager is immutable: the PM's PROJECT_MANAGER membership + effort allocation are set atomically at
         // creation, and update does not manage membership. Reject any attempt to change managerId.
         if (request.getManagerId() != null && !request.getManagerId().equals(project.getManagerId())) {
             throw new AppException(ErrorCode.PROJECT_MANAGER_IMMUTABLE);
@@ -247,11 +249,11 @@ public class ProjectService {
 
     /**
      * Hands the project over to a new PM. Unlike {@link #updateProject} (where managerId is immutable),
-     * this dedicated flow also rebuilds the LEAD membership and reassigns work:
+     * this dedicated flow also rebuilds the PROJECT_MANAGER membership and reassigns work:
      * <ol>
-     *   <li>The new manager joins as a fresh LEAD member with the requested effort allocation,
+     *   <li>The new manager joins as a fresh PROJECT_MANAGER member with the requested effort allocation,
      *       validated up-front (fail-fast) against their peak-concurrent capacity.</li>
-     *   <li>The outgoing manager is removed from the project (their LEAD membership is soft-deleted).</li>
+     *   <li>The outgoing manager is removed from the project (their PROJECT_MANAGER membership is soft-deleted).</li>
      *   <li>Every active task still assigned to the outgoing manager is reassigned to the new manager.</li>
      * </ol>
      * The new manager must not already be a member of the project.
@@ -266,20 +268,19 @@ public class ProjectService {
             throw new AppException(ErrorCode.PROJECT_MANAGER_UNCHANGED);
         }
 
-        userRepository.findById(newManagerId)
-                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        // The incoming manager must hold the PROJECT_MANAGER system role (also rejects unknown/deleted users).
+        requireUserRoleFor(newManagerId, ProjectRoleInProject.PROJECT_MANAGER);
 
         // The incoming PM always joins fresh — reject if they are already an active member.
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, newManagerId)
                 .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
 
-        // Build + validate the new PM's LEAD membership first, mirroring createProject: any capacity
+        // Build + validate the new PM's PROJECT_MANAGER membership first, mirroring createProject: any capacity
         // failure rolls back before we touch the old manager, so the project never loses its PM.
         ProjectMember newPmMember = new ProjectMember();
         newPmMember.setProjectId(projectId);
         newPmMember.setUserId(newManagerId);
-        newPmMember.setRoleInProject(ProjectRoleInProject.LEAD);
+        newPmMember.setRoleInProject(ProjectRoleInProject.PROJECT_MANAGER);
         newPmMember.setAllocatedEffortPercent(request.getManagerAllocationPercent());
         newPmMember.setJoinDate(project.getStartDate() != null ? project.getStartDate() : LocalDate.now());
         checkAllocationLimit(newPmMember.getUserId(), newPmMember.getAllocatedEffortPercent(),
@@ -344,6 +345,9 @@ public class ProjectService {
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, request.getUserId())
                 .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
 
+        // System role must match the requested project role (TEAM_MEMBER -> MEMBER, PROJECT_MANAGER -> PM).
+        requireUserRoleFor(request.getUserId(), request.getRoleInProject());
+
         ProjectMember member = new ProjectMember();
         member.setProjectId(projectId);
         member.setUserId(request.getUserId());
@@ -375,6 +379,8 @@ public class ProjectService {
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_MEMBER_NOT_FOUND));
 
         Project project = findProject(projectId);
+        // The (possibly changed) project role must still match the member's system role.
+        requireUserRoleFor(member.getUserId(), request.getRoleInProject());
         // Window = this membership's own [joinDate, leaveDate] (update does not change those);
         // the membership itself is excluded from the existing-load sweep via memberId.
         checkAllocationLimit(member.getUserId(), request.getAllocatedEffortPercent(),
@@ -387,6 +393,27 @@ public class ProjectService {
         String userName = userRepository.findById(member.getUserId())
                 .map(User::getFullName).orElse(null);
         return toMemberResponse(projectMemberRepository.save(member), userName);
+    }
+
+    /**
+     * Enforces that a user's system role is compatible with the project role they are about to hold.
+     * A PROJECT_MANAGER membership requires {@link UserRole#PROJECT_MANAGER}; any other (MEMBER)
+     * membership requires {@link UserRole#TEAM_MEMBER}. ADMIN and HR are administrative roles and
+     * may neither manage a project nor join one as a member. A null/absent {@code roleInProject} is
+     * treated as MEMBER, matching the request and entity defaults.
+     */
+    private void requireUserRoleFor(Long userId, ProjectRoleInProject roleInProject) {
+        UserRole userRole = userRepository.findById(userId)
+                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND))
+                .getRole();
+        if (roleInProject == ProjectRoleInProject.PROJECT_MANAGER) {
+            if (userRole != UserRole.PROJECT_MANAGER) {
+                throw new AppException(ErrorCode.PROJECT_MANAGER_ROLE_REQUIRED);
+            }
+        } else if (userRole != UserRole.TEAM_MEMBER) {
+            throw new AppException(ErrorCode.PROJECT_MEMBER_ROLE_REQUIRED);
+        }
     }
 
     /**
@@ -517,6 +544,33 @@ public class ProjectService {
         return ids;
     }
 
+    /**
+     * Distinct active participants across every project the current user manages
+     * ({@code managerId = currentUser}). Replaces the FE's N+1 pattern of calling
+     * {@code GET /projects/my} and then {@code GET /projects/{id}/members} per project:
+     * a user that belongs to several of the manager's projects appears exactly once.
+     *
+     * <p>Scope is the manager's own (non-deleted) projects. "Active" mirrors the assignee-eligible
+     * set elsewhere: not soft-deleted and not yet left ({@code leaveDate} null or in the future).
+     * The manager themselves is always included.
+     */
+    public List<UserMeResponse> getMyManagedProjectMembers() {
+        Long managerId = authenticatedUserResolver.currentUserId();
+        List<Long> projectIds = projectRepository.findByManagerId(managerId)
+                .stream().map(Project::getId).toList();
+        if (projectIds.isEmpty()) return List.of();
+
+        Set<Long> userIds = projectMemberRepository.findActiveMembersByProjectIdIn(projectIds)
+                .stream().map(ProjectMember::getUserId)
+                .collect(Collectors.toCollection(HashSet::new));
+        userIds.remove(managerId);
+
+        return userRepository.findAllById(userIds).stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
+                .map(userMapper::toUserMeResponse)
+                .toList();
+    }
+
     public List<UserMeResponse> searchProjectMembers(Long projectId, String q,
                                                      List<RequiredSkill> requiredSkills, int size) {
         Project project = findProject(projectId);
@@ -584,8 +638,6 @@ public class ProjectService {
     }
 
     public void requireProjectAccess(Long projectId) {
-        String role = authenticatedUserResolver.currentUserRole();
-        if ("ADMIN".equals(role)) return;
         Long userId = authenticatedUserResolver.currentUserId();
         if (!isManagerOf(projectId, userId) && !isMemberOf(projectId, userId)) {
             throw new AppException(ErrorCode.FORBIDDEN);
@@ -598,7 +650,6 @@ public class ProjectService {
      */
     public List<Long> getAccessibleProjectIds() {
         String role = authenticatedUserResolver.currentUserRole();
-        if ("ADMIN".equals(role)) return null;
         Long userId = authenticatedUserResolver.currentUserId();
         List<Long> memberIds = projectMemberRepository.findActiveProjectsByUserId(userId)
                 .stream().map(ProjectMember::getProjectId).toList();

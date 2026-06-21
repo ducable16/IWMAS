@@ -6,6 +6,7 @@ import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
 import com.iwas.search.dto.UserIndexCommand;
 import com.iwas.search.dto.UserSearchResult;
+import com.iwas.user.enums.UserRole;
 
 import java.util.List;
 import java.util.Set;
@@ -14,8 +15,8 @@ public interface ElasticsearchService {
 
     // --- User ---
     SearchResponse<UserSearchResult> searchUsers(SearchRequest request);
-    List<SuggestionItem> autocompleteUsers(String prefix, int topN);
-    List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds);
+    List<SuggestionItem> autocompleteUsers(String prefix, int topN, UserRole role);
+    List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds, UserRole role);
     void indexUser(UserIndexCommand command);
     void deleteUser(Long userId);
 

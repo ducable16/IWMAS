@@ -13,6 +13,7 @@ import com.iwas.search.service.SearchFallbackService;
 import com.iwas.skill.dto.RequiredSkill;
 import com.iwas.skill.entity.EmployeeSkill;
 import com.iwas.user.entity.User;
+import com.iwas.user.enums.UserRole;
 import com.iwas.user.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -62,6 +63,9 @@ public class DatabaseAdapter implements SearchFallbackService {
                         cb.like(cb.lower(root.get("position")), like),
                         cb.like(cb.lower(root.get("email")), like)));
             }
+            if (request.getRole() != null) {
+                predicates.add(cb.equal(root.get("role"), request.getRole()));
+            }
             for (RequiredSkill rs : requiredSkills) {
                 Subquery<Long> sub = q.subquery(Long.class);
                 Root<EmployeeSkill> es = sub.from(EmployeeSkill.class);
@@ -96,9 +100,10 @@ public class DatabaseAdapter implements SearchFallbackService {
     }
 
     @Override
-    public List<SuggestionItem> autocompleteUsers(String prefix, int topN) {
+    public List<SuggestionItem> autocompleteUsers(String prefix, int topN, UserRole role) {
         SearchRequest req = SearchRequest.builder()
                 .query(prefix)
+                .role(role)
                 .page(0)
                 .size(topN)
                 .build();
@@ -111,20 +116,23 @@ public class DatabaseAdapter implements SearchFallbackService {
     }
 
     @Override
-    public List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds) {
+    public List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds, UserRole role) {
         String like = "%" + prefix.toLowerCase() + "%";
 
         Specification<User> spec = (root, q, cb) -> {
-            jakarta.persistence.criteria.Predicate base = cb.and(
-                    cb.equal(root.get("isDeleted"), false),
-                    cb.or(
-                            cb.like(cb.lower(root.get("fullName")), like),
-                            cb.like(cb.lower(root.get("position")), like),
-                            cb.like(cb.lower(root.get("email")), like)));
-            if (!excludeIds.isEmpty()) {
-                return cb.and(base, cb.not(root.get("id").in(excludeIds)));
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("isDeleted"), false));
+            predicates.add(cb.or(
+                    cb.like(cb.lower(root.get("fullName")), like),
+                    cb.like(cb.lower(root.get("position")), like),
+                    cb.like(cb.lower(root.get("email")), like)));
+            if (role != null) {
+                predicates.add(cb.equal(root.get("role"), role));
             }
-            return base;
+            if (!excludeIds.isEmpty()) {
+                predicates.add(cb.not(root.get("id").in(excludeIds)));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
         };
 
         PageRequest pageable = PageRequest.of(0, topN, Sort.by(Sort.Direction.ASC, "fullName"));

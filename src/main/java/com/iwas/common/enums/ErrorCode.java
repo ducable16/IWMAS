@@ -62,6 +62,8 @@ public enum ErrorCode {
     PROJECT_MEMBER_ALLOC_REQUIRED(4008, "Allocated effort percent is required", HttpStatus.BAD_REQUEST),
     PROJECT_MANAGER_IMMUTABLE(4009, "Project manager cannot be changed after creation", HttpStatus.CONFLICT),
     PROJECT_MANAGER_UNCHANGED(4010, "New manager must be different from the current manager", HttpStatus.BAD_REQUEST),
+    PROJECT_MEMBER_ROLE_REQUIRED(4011, "Only users with the Team Member role can join a project as a member", HttpStatus.BAD_REQUEST),
+    PROJECT_MANAGER_ROLE_REQUIRED(4012, "Only users with the Project Manager role can be a project's manager", HttpStatus.BAD_REQUEST),
 
     // --- 5xxx: Tasks ---
     TASK_NOT_FOUND(5001, "Task not found", HttpStatus.NOT_FOUND),
@@ -78,9 +80,6 @@ public enum ErrorCode {
 
     // --- 7xxx: Notifications ---
     NOTIFICATION_NOT_FOUND(7001, "Notification not found", HttpStatus.NOT_FOUND),
-
-    // --- 8xxx: Workload ---
-    WORKLOAD_SNAPSHOT_NOT_FOUND(8001, "Workload snapshot not found", HttpStatus.NOT_FOUND),
 
     // --- 95xx: Search ---
     SEARCH_QUERY_TOO_SHORT(9501, "Search query too short", HttpStatus.BAD_REQUEST),

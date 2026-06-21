@@ -10,6 +10,7 @@ import com.iwas.search.dto.SearchRequest;
 import com.iwas.search.dto.SearchResponse;
 import com.iwas.search.dto.SuggestionItem;
 import com.iwas.search.dto.UserSearchResult;
+import com.iwas.user.enums.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -36,7 +37,7 @@ public class SearchService {
     // User
     // -------------------------------------------------------------------------
 
-    public AutocompleteResponse autocomplete(String query, Long projectId, Long excludeProjectId) {
+    public AutocompleteResponse autocomplete(String query, Long projectId, Long excludeProjectId, UserRole role) {
         long start = System.currentTimeMillis();
         String prefix = normalize(query);
         int minLen = properties.getAutocomplete().getMinPrefixLength();
@@ -50,6 +51,7 @@ public class SearchService {
             List<SuggestionItem> suggestions = projectService
                     .searchProjectMembers(projectId, query, List.of(), topN)
                     .stream()
+                    .filter(u -> role == null || role == u.getRole())
                     .map(u -> SuggestionItem.builder().term(u.getFullName()).entityId(u.getId()).build())
                     .toList();
             return AutocompleteResponse.builder()
@@ -62,12 +64,12 @@ public class SearchService {
             List<SuggestionItem> suggestions = List.of();
             String source = "elasticsearch";
             try {
-                suggestions = engine.autocompleteUsersExcluding(prefix, topN, excludeIds);
+                suggestions = engine.autocompleteUsersExcluding(prefix, topN, excludeIds, role);
             } catch (Exception e) {
                 log.warn("Elasticsearch autocomplete (exclude) failed, falling back to DB: {}", e.getMessage());
             }
             if (suggestions.isEmpty()) {
-                suggestions = fallback.autocompleteUsersExcluding(prefix, topN, excludeIds);
+                suggestions = fallback.autocompleteUsersExcluding(prefix, topN, excludeIds, role);
                 source = "database";
             }
             return AutocompleteResponse.builder()
@@ -75,27 +77,33 @@ public class SearchService {
                     .tookMs(System.currentTimeMillis() - start).build();
         }
 
-        List<SuggestionItem> cached = cache.getSuggestions(ENTITY_USER, prefix);
-        if (!cached.isEmpty()) {
-            return AutocompleteResponse.builder()
-                    .prefix(prefix).suggestions(cached).source("redis")
-                    .tookMs(System.currentTimeMillis() - start).build();
+        // Redis cache is keyed by prefix only, so it is used only for the unfiltered (role == null)
+        // case; a role filter bypasses the cache to avoid cross-role result pollution.
+        if (role == null) {
+            List<SuggestionItem> cached = cache.getSuggestions(ENTITY_USER, prefix);
+            if (!cached.isEmpty()) {
+                return AutocompleteResponse.builder()
+                        .prefix(prefix).suggestions(cached).source("redis")
+                        .tookMs(System.currentTimeMillis() - start).build();
+            }
         }
 
         List<SuggestionItem> suggestions = List.of();
         String source = "elasticsearch";
         try {
-            suggestions = engine.autocompleteUsers(prefix, topN);
+            suggestions = engine.autocompleteUsers(prefix, topN, role);
         } catch (Exception e) {
             log.warn("Elasticsearch autocomplete failed, falling back to DB: {}", e.getMessage());
         }
 
         if (suggestions.isEmpty()) {
-            suggestions = fallback.autocompleteUsers(prefix, topN);
+            suggestions = fallback.autocompleteUsers(prefix, topN, role);
             source = "database";
         }
 
-        warmCacheAsync(ENTITY_USER, prefix, suggestions);
+        if (role == null) {
+            warmCacheAsync(ENTITY_USER, prefix, suggestions);
+        }
 
         return AutocompleteResponse.builder()
                 .prefix(prefix).suggestions(suggestions).source(source)

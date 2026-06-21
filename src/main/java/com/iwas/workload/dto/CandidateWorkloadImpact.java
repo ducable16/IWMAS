@@ -20,9 +20,8 @@ public class CandidateWorkloadImpact {
     private Long projectId;
     private WorkloadLevel levelBefore;
     private WorkloadLevel levelAfter;
-    private BigDecimal overallPercentBefore;
-    private BigDecimal overallPercentAfter;
-    private BigDecimal nearTermPercentAfter;
+    private BigDecimal workloadPercentBefore;
+    private BigDecimal workloadPercentAfter;
     private Integer predictedLateTaskCountAfter;
     /** The candidate task itself is projected to miss its own due date. */
     private boolean candidateTaskWillSlip;
