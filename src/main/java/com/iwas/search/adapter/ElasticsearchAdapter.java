@@ -278,6 +278,32 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     }
 
     @Override
+    public List<SuggestionItem> autocompleteProjectsWithin(String prefix, int topN, Set<Long> allowedIds) {
+        if (allowedIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> idStrings = allowedIds.stream().map(String::valueOf).toList();
+        Query query = Query.of(q -> q.bool(b -> b
+                .should(s -> s.matchPhrasePrefix(p -> p.field("name").query(prefix)))
+                .filter(f -> f.term(t -> t.field("isDeleted").value(false)))
+                .filter(f -> f.ids(i -> i.values(idStrings)))));
+
+        NativeQuery nq = NativeQuery.builder()
+                .withQuery(query)
+                .withPageable(PageRequest.of(0, topN))
+                .build();
+
+        SearchHits<ProjectSearchDocument> hits = elasticsearchOperations.search(nq, ProjectSearchDocument.class);
+
+        return hits.getSearchHits().stream()
+                .map(h -> SuggestionItem.builder()
+                        .term(h.getContent().getName())
+                        .entityId(h.getContent().getId())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public void indexProject(ProjectSearchResult project) {
         ProjectSearchDocument doc = ProjectSearchDocument.builder()
                 .id(project.getId())

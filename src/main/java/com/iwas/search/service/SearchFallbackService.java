@@ -20,4 +20,5 @@ public interface SearchFallbackService {
     // --- Project ---
     SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request);
     List<SuggestionItem> autocompleteProjects(String prefix, int topN);
+    List<SuggestionItem> autocompleteProjectsWithin(String prefix, int topN, Set<Long> allowedIds);
 }

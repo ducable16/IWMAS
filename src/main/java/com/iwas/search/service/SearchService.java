@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -142,6 +143,13 @@ public class SearchService {
         }
         int topN = properties.getAutocomplete().getMaxSuggestions();
 
+        // Restrict suggestions to projects the current user participates in. A null result
+        // means ADMIN (no restriction); an empty list means the user is in no project.
+        List<Long> accessibleIds = projectService.getAccessibleProjectIds();
+        if (accessibleIds != null) {
+            return autocompleteMyProjects(prefix, topN, accessibleIds, start);
+        }
+
         List<SuggestionItem> cached = cache.getSuggestions(ENTITY_PROJECT, prefix);
         if (!cached.isEmpty()) {
             return AutocompleteResponse.builder()
@@ -163,6 +171,38 @@ public class SearchService {
         }
 
         warmCacheAsync(ENTITY_PROJECT, prefix, suggestions);
+
+        return AutocompleteResponse.builder()
+                .prefix(prefix).suggestions(suggestions).source(source)
+                .tookMs(System.currentTimeMillis() - start).build();
+    }
+
+    /**
+     * Autocomplete restricted to the given accessible project IDs. The Redis cache is keyed
+     * by prefix only (shared across users), so it is bypassed here to avoid leaking a user's
+     * projects to others.
+     */
+    private AutocompleteResponse autocompleteMyProjects(String prefix, int topN,
+                                                        List<Long> accessibleIds, long start) {
+        if (accessibleIds.isEmpty()) {
+            return AutocompleteResponse.builder()
+                    .prefix(prefix).suggestions(List.of()).source("database")
+                    .tookMs(System.currentTimeMillis() - start).build();
+        }
+        Set<Long> allowedIds = new HashSet<>(accessibleIds);
+
+        List<SuggestionItem> suggestions = List.of();
+        String source = "elasticsearch";
+        try {
+            suggestions = engine.autocompleteProjectsWithin(prefix, topN, allowedIds);
+        } catch (Exception e) {
+            log.warn("Elasticsearch project autocomplete (scoped) failed, falling back to DB: {}", e.getMessage());
+        }
+
+        if (suggestions.isEmpty()) {
+            suggestions = fallback.autocompleteProjectsWithin(prefix, topN, allowedIds);
+            source = "database";
+        }
 
         return AutocompleteResponse.builder()
                 .prefix(prefix).suggestions(suggestions).source(source)

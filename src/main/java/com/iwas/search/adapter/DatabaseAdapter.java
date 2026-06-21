@@ -194,6 +194,28 @@ public class DatabaseAdapter implements SearchFallbackService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<SuggestionItem> autocompleteProjectsWithin(String prefix, int topN, Set<Long> allowedIds) {
+        if (allowedIds.isEmpty()) {
+            return List.of();
+        }
+        String like = "%" + prefix.toLowerCase() + "%";
+        Specification<Project> spec = (root, q, cb) -> cb.and(
+                cb.equal(root.get("isDeleted"), false),
+                root.get("id").in(allowedIds),
+                cb.or(
+                        cb.like(cb.lower(root.get("name")), like),
+                        cb.like(cb.lower(root.get("code")), like)));
+
+        PageRequest pageable = PageRequest.of(0, topN, Sort.by(Sort.Direction.ASC, "name"));
+        return projectRepository.findAll(spec, pageable).getContent().stream()
+                .map(p -> SuggestionItem.builder()
+                        .term(p.getName())
+                        .entityId(p.getId())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------

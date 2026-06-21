@@ -23,6 +23,7 @@ public interface ElasticsearchService {
     // --- Project ---
     SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request);
     List<SuggestionItem> autocompleteProjects(String prefix, int topN);
+    List<SuggestionItem> autocompleteProjectsWithin(String prefix, int topN, Set<Long> allowedIds);
     void indexProject(ProjectSearchResult project);
     void deleteProject(Long projectId);
 
