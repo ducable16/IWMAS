@@ -31,8 +31,6 @@ import com.iwas.user.mapper.UserMapper;
 import com.iwas.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -67,10 +65,6 @@ public class TaskService {
     @Lazy
     @Autowired
     private TaskCommentService taskCommentService;
-
-    @Lazy
-    @Autowired
-    private TaskService self;
 
     public List<TaskResponse> getTasksByProject(Long projectId) {
         projectService.requireProjectAccess(projectId);
@@ -160,13 +154,11 @@ public class TaskService {
                 .build();
     }
 
-    // Access-check wrapper — delegates to the cached implementation via proxy
     public KanbanBoardResponse getKanbanBoard(Long projectId) {
         projectService.requireProjectAccess(projectId);
-        return self.getKanbanBoardCached(projectId);
+        return getKanbanBoardCached(projectId);
     }
 
-    @Cacheable(value = "kanbanBoard", key = "#projectId")
     public KanbanBoardResponse getKanbanBoardCached(Long projectId) {
         List<Task> tasks = taskRepository.findAll(TaskSpecification.byProjectId(projectId));
         Map<TaskStatus, List<Task>> grouped = tasks.stream()
@@ -192,7 +184,6 @@ public class TaskService {
     }
 
     @Transactional
-    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse createTask(TaskRequest request, Long reporterId) {
         validateAssignee(request.getProjectId(), request.getAssigneeId());
         validateAssigneeSkills(request.getAssigneeId(), null, request.getSkillRequirements());
@@ -219,7 +210,6 @@ public class TaskService {
     }
 
     @Transactional
-    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse updateTask(Long id, TaskRequest request) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
@@ -270,7 +260,6 @@ public class TaskService {
     }
 
     @Transactional
-    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request, Long changedById) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
@@ -307,7 +296,6 @@ public class TaskService {
     }
 
     @Transactional
-    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public TaskResponse updateTaskDates(Long id, TaskDateUpdateRequest request) {
         Task task = findTask(id);
         requireTaskEditAccess(task);
@@ -329,7 +317,6 @@ public class TaskService {
     }
 
     @Transactional
-    @CacheEvict(value = "kanbanBoard", allEntries = true)
     public void deleteTask(Long id) {
         Task task = findTask(id);
         Long actor = authenticatedUserResolver.currentUserId();

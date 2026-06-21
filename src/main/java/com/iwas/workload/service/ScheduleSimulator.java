@@ -35,9 +35,6 @@ import java.util.Map;
 @Component
 public class ScheduleSimulator {
 
-    /** Window (in workdays from today) used for the near-term tightness metric. */
-    public static final int NEAR_TERM_WORKDAYS = 10;
-
     private static final double EPS = 1e-6;
     /** Hard stop for the forward loop — a task unfinished past this is unschedulable. */
     private static final int MAX_HORIZON_YEARS = 5;
@@ -52,10 +49,9 @@ public class ScheduleSimulator {
     public record TaskSchedule(Long taskId, LocalDate projectedStart, LocalDate projectedFinish,
                                boolean willSlip, long lateByWorkdays) {}
 
-    /** Per-lane result: forecasts plus the order-independent tightness metrics. */
+    /** Per-lane result: forecasts plus the order-independent tightness metric. */
     public record LaneSimulation(List<TaskSchedule> schedules,
-                                 BigDecimal nearTermPercent,
-                                 BigDecimal overallPercent,
+                                 BigDecimal workloadPercent,
                                  int predictedLateTaskCount) {}
 
     // ─── workday calendar ─────────────────────────────────────────────────────
@@ -137,7 +133,7 @@ public class ScheduleSimulator {
         }
 
         double subCap = subCapacityPerDay == null ? 0.0 : subCapacityPerDay.doubleValue();
-        double[] pct = tightness(workable, subCap, today);
+        double pct = tightness(workable, subCap, today);
 
         List<TaskSchedule> schedules;
         if (subCap <= EPS) {
@@ -153,8 +149,7 @@ public class ScheduleSimulator {
 
         int late = (int) schedules.stream().filter(TaskSchedule::willSlip).count();
         return new LaneSimulation(schedules,
-                BigDecimal.valueOf(pct[0]).setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(pct[1]).setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(pct).setScale(2, RoundingMode.HALF_UP),
                 late);
     }
 
@@ -223,11 +218,11 @@ public class ScheduleSimulator {
     /**
      * Order-independent tightness metric. For each task with a deadline,
      * cumulative remaining work (sorted by deadline, overdue clamped to today)
-     * over the capacity available until that deadline. Returns {nearTerm, overall}
-     * as the worst (max) ratio in percent.
+     * over the capacity available until that deadline. Returns the worst (max)
+     * ratio across all deadlines, in percent — a single demand/capacity load.
      */
-    private double[] tightness(List<ScheduledTask> workable, double subCap, LocalDate today) {
-        if (subCap <= EPS) return new double[]{0.0, 0.0};
+    private double tightness(List<ScheduledTask> workable, double subCap, LocalDate today) {
+        if (subCap <= EPS) return 0.0;
 
         List<ScheduledTask> withDue = new ArrayList<>();
         for (ScheduledTask t : workable) {
@@ -235,19 +230,16 @@ public class ScheduleSimulator {
         }
         withDue.sort(Comparator.comparing(t -> effectiveDue(t.dueDate(), today)));
 
-        LocalDate nearHorizon = addWorkdays(today, NEAR_TERM_WORKDAYS - 1);
         double cumulative = 0.0;
-        double nearMax = 0.0;
-        double overallMax = 0.0;
+        double workloadMax = 0.0;
         for (ScheduledTask t : withDue) {
             cumulative += t.remaining().doubleValue();
             LocalDate due = effectiveDue(t.dueDate(), today);
             long capDays = Math.max(1, countWorkdays(today, due));
             double ratio = cumulative / (capDays * subCap) * 100.0;
-            overallMax = Math.max(overallMax, ratio);
-            if (!due.isAfter(nearHorizon)) nearMax = Math.max(nearMax, ratio);
+            workloadMax = Math.max(workloadMax, ratio);
         }
-        return new double[]{nearMax, overallMax};
+        return workloadMax;
     }
 
     private static LocalDate effectiveDue(LocalDate due, LocalDate today) {

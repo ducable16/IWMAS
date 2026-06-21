@@ -34,7 +34,7 @@ public class TaskArrangementController {
     // ─── explicit lane (PM / admin view of any member) ─────────────────────────
 
     @GetMapping("/lanes/{projectId}/{assigneeId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasAnyRole('HR', 'PROJECT_MANAGER')")
     public ArrangeResponse arrange(@PathVariable Long projectId, @PathVariable Long assigneeId,
                                    @RequestParam(required = false) Double k,
                                    @RequestParam(required = false) Double wCritical,
@@ -46,7 +46,7 @@ public class TaskArrangementController {
     }
 
     @GetMapping("/lanes/{projectId}/{assigneeId}/next")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasAnyRole('HR', 'PROJECT_MANAGER')")
     public NextTaskResponse next(@PathVariable Long projectId, @PathVariable Long assigneeId,
                                  @RequestParam(required = false) Double k) {
         return arrangementService.nextTask(projectId, assigneeId, k, null);

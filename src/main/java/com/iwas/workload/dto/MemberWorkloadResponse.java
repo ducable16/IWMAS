@@ -13,9 +13,10 @@ import java.util.List;
 /**
  * Real-time workload of a member under the v3 schedule-simulation model.
  *
- * Percent fields are tightness ratios (cumulative demand / available
- * capacity) and may exceed 100. {@code workloadLevel} is the aggregate risk
- * badge across the member's project lanes — the primary signal for a PM.
+ * {@code workloadPercent} is a tightness ratio (cumulative demand / available
+ * capacity across all deadlines) and may exceed 100. {@code workloadLevel} is
+ * the aggregate risk badge across the member's project lanes — the primary
+ * signal for a PM.
  */
 @Getter
 @Builder
@@ -23,15 +24,10 @@ public class MemberWorkloadResponse {
     private Long userId;
     private String userFullName;
     private String position;
-    /** Near-term window bounds (today .. today + 10 workdays) used for nearTermPercent. */
-    private LocalDate weekStart;
-    private LocalDate weekEnd;
     /** Aggregate risk badge — the worst lane badge across all the member's projects. */
     private WorkloadLevel workloadLevel;
-    /** Worst near-term tightness across lanes (deadlines within the near-term window). */
-    private BigDecimal nearTermPercent;
-    /** Worst overall-feasibility tightness across lanes (all deadlines). */
-    private BigDecimal overallPercent;
+    /** Worst tightness across lanes (cumulative demand / capacity over all deadlines). */
+    private BigDecimal workloadPercent;
     private Integer activeTaskCount;
     private Integer overdueTaskCount;
     /** Tasks the simulation predicts will miss their deadline (excludes already-overdue). */
@@ -79,8 +75,7 @@ public class MemberWorkloadResponse {
         private Integer allocatedEffortPercent;
         private BigDecimal dailyCapacityHours;
         private WorkloadLevel workloadLevel;
-        private BigDecimal nearTermPercent;
-        private BigDecimal overallPercent;
+        private BigDecimal workloadPercent;
         private Integer predictedLateTaskCount;
     }
 }

@@ -22,8 +22,7 @@ public class ProjectScheduleResponse {
     private Integer allocatedEffortPercent;
     private BigDecimal dailyCapacityHours;
     private WorkloadLevel workloadLevel;
-    private BigDecimal nearTermPercent;
-    private BigDecimal overallPercent;
+    private BigDecimal workloadPercent;
     private Integer predictedLateTaskCount;
     private boolean savedOrder;
     /** Tasks in simulated execution order; non-schedulable tasks appended last. */

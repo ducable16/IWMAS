@@ -20,6 +20,12 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.projectId = :projectId AND (pm.leaveDate IS NULL OR pm.leaveDate >= CURRENT_DATE)")
     List<ProjectMember> findActiveMembersByProjectId(Long projectId);
 
+    // Active members across a set of projects in one query (same "active" semantics as
+    // findActiveMembersByProjectId). Used to gather the distinct participants of all projects a
+    // PM manages without an N+1 per-project fan-out.
+    @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.projectId IN :projectIds AND (pm.leaveDate IS NULL OR pm.leaveDate >= CURRENT_DATE)")
+    List<ProjectMember> findActiveMembersByProjectIdIn(@Param("projectIds") List<Long> projectIds);
+
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.userId = :userId AND (pm.leaveDate IS NULL OR pm.leaveDate >= CURRENT_DATE)")
     List<ProjectMember> findActiveProjectsByUserId(Long userId);
 

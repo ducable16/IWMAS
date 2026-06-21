@@ -24,7 +24,7 @@ public class ProjectController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     public ProjectPageResponse getAllProjects(@ModelAttribute ProjectFilterRequest filter) {
         return projectService.searchProjects(filter);
     }
@@ -34,8 +34,14 @@ public class ProjectController {
         return projectService.searchMyProjects(authenticatedUserResolver.currentUserId(), filter);
     }
 
+    @GetMapping("/my/members")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
+    public List<UserMeResponse> getMyManagedProjectMembers() {
+        return projectService.getMyManagedProjectMembers();
+    }
+
     @GetMapping("/suggest-code")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     public ProjectCodeSuggestResponse suggestCode(@RequestParam String name) {
         return projectService.suggestCode(name);
     }
@@ -46,28 +52,28 @@ public class ProjectController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     @ResponseStatus(HttpStatus.CREATED)
     public ProjectResponse create(@Valid @RequestBody ProjectRequest request) {
         return projectService.createProject(request);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     public ProjectResponse update(@PathVariable Long id,
                                   @Valid @RequestBody ProjectRequest request) {
         return projectService.updateProject(id, request);
     }
 
     @PatchMapping("/{id}/manager")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     public ProjectResponse changeManager(@PathVariable Long id,
                                          @Valid @RequestBody ProjectManagerChangeRequest request) {
         return projectService.changeManager(id, request);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         projectService.deleteProject(id);
@@ -88,7 +94,7 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/members")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     @ResponseStatus(HttpStatus.CREATED)
     public ProjectMemberResponse addMember(@PathVariable Long id,
                                            @Valid @RequestBody ProjectMemberRequest request) {
@@ -96,7 +102,7 @@ public class ProjectController {
     }
 
     @PutMapping("/{id}/members/{memberId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     public ProjectMemberResponse updateMember(@PathVariable Long id,
                                               @PathVariable Long memberId,
                                               @Valid @RequestBody ProjectMemberRequest request) {
@@ -104,7 +110,7 @@ public class ProjectController {
     }
 
     @DeleteMapping("/{id}/members/{memberId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeMember(@PathVariable Long id,
                              @PathVariable Long memberId) {
@@ -112,7 +118,7 @@ public class ProjectController {
     }
 
     @GetMapping("/users/{userId}/effort-remaining")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
     public UserEffortRemainingResponse getUserEffortRemaining(
             @PathVariable Long userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
