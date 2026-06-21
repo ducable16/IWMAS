@@ -427,8 +427,6 @@ public class TaskService {
     // --- Access control helpers ---
 
     private void requireTaskEditAccess(Task task) {
-        String role = authenticatedUserResolver.currentUserRole();
-        if ("ADMIN".equals(role)) return;
         Long userId = authenticatedUserResolver.currentUserId();
         boolean isPM = projectService.isManagerOf(task.getProjectId(), userId);
         boolean isAssignee = userId.equals(task.getAssigneeId());

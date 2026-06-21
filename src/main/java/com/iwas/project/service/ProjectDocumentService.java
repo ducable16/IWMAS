@@ -65,11 +65,10 @@ public class ProjectDocumentService {
                 .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
 
         Long callerId = authenticatedUserResolver.currentUserId();
-        String role = authenticatedUserResolver.currentUserRole();
         boolean isUploader = doc.getUploadedBy().equals(callerId);
-        boolean isManagerOrAdmin = "ADMIN".equals(role) || projectService.isManagerOf(projectId, callerId);
+        boolean isManager = projectService.isManagerOf(projectId, callerId);
 
-        if (!isUploader && !isManagerOrAdmin) {
+        if (!isUploader && !isManager) {
             throw new AppException(ErrorCode.FORBIDDEN);
         }
 

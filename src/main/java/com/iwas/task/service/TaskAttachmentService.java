@@ -73,11 +73,10 @@ public class TaskAttachmentService {
                 .orElseThrow(() -> new AppException(ErrorCode.ATTACHMENT_NOT_FOUND));
 
         Long callerId = authenticatedUserResolver.currentUserId();
-        String role = authenticatedUserResolver.currentUserRole();
         boolean isUploader = attachment.getUploadedBy().equals(callerId);
-        boolean isManagerOrAdmin = "ADMIN".equals(role) || projectService.isManagerOf(task.getProjectId(), callerId);
+        boolean isManager = projectService.isManagerOf(task.getProjectId(), callerId);
 
-        if (!isUploader && !isManagerOrAdmin) {
+        if (!isUploader && !isManager) {
             throw new AppException(ErrorCode.FORBIDDEN);
         }
 
