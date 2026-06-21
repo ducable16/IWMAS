@@ -18,8 +18,6 @@ import com.iwas.user.repository.UserRepository;
 import com.iwas.workload.dto.CandidateWorkloadImpact;
 import com.iwas.workload.dto.MemberWorkloadResponse;
 import com.iwas.workload.enums.WorkloadLevel;
-import com.iwas.workload.repository.BurnoutLogRepository;
-import com.iwas.workload.repository.WorkloadSnapshotRepository;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,8 +47,6 @@ class WorkloadServiceTest {
     @Mock ProjectMemberRepository projectMemberRepo;
     @Mock ProjectRepository projectRepo;
     @Mock UserRepository userRepo;
-    @Mock WorkloadSnapshotRepository workloadSnapshotRepo;
-    @Mock BurnoutLogRepository burnoutLogRepo;
     @Mock NotificationService notificationService;
     @Spy ScheduleSimulator scheduleSimulator = new ScheduleSimulator();
     @Spy TardinessArranger tardinessArranger = new TardinessArranger();

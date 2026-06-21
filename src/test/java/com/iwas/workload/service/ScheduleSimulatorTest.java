@@ -156,20 +156,19 @@ class ScheduleSimulatorTest {
         ScheduledTask t = task(1, 20, MON, ScheduleSimulator.addWorkdays(MON, 4));
         LaneSimulation result = sim.simulate(List.of(t), CAP_8H, MON);
 
-        assertEquals(0, result.overallPercent().compareTo(BigDecimal.valueOf(50.00)));
-        assertEquals(0, result.nearTermPercent().compareTo(BigDecimal.valueOf(50.00)));
+        assertEquals(0, result.workloadPercent().compareTo(BigDecimal.valueOf(50.00)));
     }
 
     @Test
-    void nearTermAndOverallDivergeForFarDeadlines() {
-        // Small near task + a huge task with a deadline beyond the near-term window.
+    void workloadPercentCountsFarDeadlines() {
+        // A small near task plus a huge far-deadline task. workloadPercent spans ALL
+        // deadlines, so the far cluster (4+200=204h over 60 workdays × 8h = 480) drives it
+        // to 42.50% — well above the near task's own 4/24 = 16.67%.
         ScheduledTask near = task(1, 4, MON, ScheduleSimulator.addWorkdays(MON, 2));
         ScheduledTask far = task(2, 200, MON, ScheduleSimulator.addWorkdays(MON, 59));
         LaneSimulation result = sim.simulate(List.of(near, far), CAP_8H, MON);
 
-        assertTrue(result.overallPercent().compareTo(result.nearTermPercent()) > 0,
-                "the far deadline cluster lifts overall above near-term");
-        assertTrue(result.nearTermPercent().compareTo(BigDecimal.valueOf(50)) < 0,
-                "near-term stays low — member is free this fortnight");
+        assertEquals(0, result.workloadPercent().compareTo(BigDecimal.valueOf(42.50)),
+                "the far deadline cluster is included in the single workload metric");
     }
 }

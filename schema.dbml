@@ -94,7 +94,7 @@ Table project_members {
   id bigserial [pk, note: 'Primary key']
   project_id bigint [not null, note: 'Project']
   user_id bigint [not null, note: 'Participating employee']
-  role_in_project varchar(50) [not null, default: 'MEMBER', note: 'Role in project: LEAD / MEMBER / SUPPORTER']
+  role_in_project varchar(50) [not null, default: 'MEMBER', note: 'Role in project: PROJECT_MANAGER / MEMBER']
   allocated_effort_percent int [note: 'Percentage of time allocated to this project (e.g. 50 = 50% of time)']
   join_date date [note: 'Date joined the project']
   leave_date date [note: 'Date left the project (if applicable)']
@@ -150,14 +150,14 @@ Table task_skill_requirements {
   }
 }
 
-Table task_status_history {
+Table task_activity {
   id bigserial [pk, note: 'Primary key']
-  task_id bigint [not null, note: 'Task whose status changed']
-  old_status varchar(50) [note: 'Previous status']
-  new_status varchar(50) [not null, note: 'New status']
-  changed_by bigint [not null, note: 'Who made the change']
-  note text [note: 'Reason for change (if any)']
-  changed_at timestamp [not null, default: `now()`]
+  task_id bigint [not null, note: 'Task this activity belongs to']
+  action varchar(40) [not null, note: 'TaskActivityType: STATUS_CHANGED, PRIORITY_CHANGED, ASSIGNEE_CHANGED, ESTIMATE_CHANGED, TYPE_CHANGED, TITLE_CHANGED, DESCRIPTION_CHANGED, START_DATE_CHANGED, DUE_DATE_CHANGED, TASK_CREATED, TASK_DELETED, ATTACHMENT_ADDED, ATTACHMENT_REMOVED']
+  old_value text [note: 'Raw value before the change (enum name / user id / number / ISO date / file name)']
+  new_value text [note: 'Raw value after the change']
+  actor_id bigint [not null, note: 'Who performed the action']
+  created_at timestamp [not null, default: `now()`]
 }
 
 // ================================================================
@@ -197,40 +197,6 @@ Table notifications {
   read_at timestamp [note: 'Time it was read']
   created_at timestamp [not null, default: `now()`]
 }
-
-// ================================================================
-// Workload & Capacity
-// ================================================================
-
-Table workload_snapshots {
-  id bigserial [pk, note: 'Primary key']
-  user_id bigint [not null, note: 'Employee']
-  snapshot_date date [not null, note: 'Date of the snapshot']
-  total_allocated_hours decimal(6,1) [note: 'Total hours allocated across all projects']
-  total_actual_hours decimal(6,1) [note: 'Total actual hours worked']
-  capacity_used_percent decimal(5,2) [note: 'Percentage of capacity used']
-  project_count int [default: 0, note: 'Number of active projects']
-  active_task_count int [default: 0, note: 'Number of active tasks']
-  created_at timestamp [not null, default: `now()`]
-
-  indexes {
-    (user_id, snapshot_date) [unique, note: 'One snapshot per user per day']
-  }
-}
-
-Table burnout_logs {
-  id bigserial [pk, note: 'Primary key']
-  user_id bigint [not null, note: 'Employee being monitored']
-  evaluated_at timestamp [not null, default: `now()`, note: 'Time the system performed the evaluation']
-  risk_score int [not null, note: 'Burnout risk score from 0 to 100']
-  risk_level varchar(20) [not null, note: 'Risk level: LOW / MEDIUM / HIGH / CRITICAL']
-  overdue_task_count int [default: 0, note: 'Number of recently overdue tasks']
-  capacity_used_avg decimal(5,2) [note: 'Average % capacity used over the last 4 weeks']
-  is_alert_sent boolean [default: false, note: 'Whether an alert has been sent to the manager']
-  note text [note: 'Notes on the reason for evaluation']
-  created_at timestamp [not null, default: `now()`]
-}
-
 
 // ================================================================
 // References
@@ -273,9 +239,9 @@ Ref: task_skill_requirements.task_id > tasks.id
 Ref: task_skill_requirements.skill_id > skills.id
 Ref: task_skill_requirements.created_by > users.id
 
-// task_status_history
-Ref: task_status_history.task_id > tasks.id
-Ref: task_status_history.changed_by > users.id
+// task_activity
+Ref: task_activity.task_id > tasks.id
+Ref: task_activity.actor_id > users.id
 
 // time_logs
 Ref: time_logs.task_id > tasks.id
@@ -285,9 +251,3 @@ Ref: time_logs.updated_by > users.id
 
 // notifications
 Ref: notifications.recipient_id > users.id
-
-// workload_snapshots
-Ref: workload_snapshots.user_id > users.id
-
-// burnout_logs
-Ref: burnout_logs.user_id > users.id

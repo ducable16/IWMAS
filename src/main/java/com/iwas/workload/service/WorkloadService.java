@@ -18,16 +18,10 @@ import com.iwas.task.enums.TaskPriority;
 import com.iwas.task.repository.TaskRepository;
 import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
-import com.iwas.workload.dto.BurnoutLogResponse;
 import com.iwas.workload.dto.MemberWorkloadResponse;
 import com.iwas.workload.dto.MemberWorkloadResponse.ProjectAllocationItem;
 import com.iwas.workload.dto.MemberWorkloadResponse.TaskWorkloadItem;
-import com.iwas.workload.dto.WorkloadSnapshotResponse;
-import com.iwas.workload.entity.BurnoutLog;
-import com.iwas.workload.entity.WorkloadSnapshot;
 import com.iwas.workload.enums.WorkloadLevel;
-import com.iwas.workload.repository.BurnoutLogRepository;
-import com.iwas.workload.repository.WorkloadSnapshotRepository;
 import com.iwas.workload.service.ScheduleSimulator.LaneSimulation;
 import com.iwas.workload.service.ScheduleSimulator.ScheduledTask;
 import com.iwas.workload.service.ScheduleSimulator.TaskSchedule;
@@ -66,8 +60,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class WorkloadService {
 
-    private final WorkloadSnapshotRepository workloadSnapshotRepository;
-    private final BurnoutLogRepository burnoutLogRepository;
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
@@ -126,8 +118,7 @@ public class WorkloadService {
 
     private record LaneResult(ProjectAllocationItem item,
                               WorkloadLevel level,
-                              BigDecimal nearTermPercent,
-                              BigDecimal overallPercent,
+                              BigDecimal workloadPercent,
                               int overdueCount,
                               int predictedLateCount,
                               int unestimatedCount,
@@ -184,8 +175,7 @@ public class WorkloadService {
         boolean hasCapacity = dailyCap != null && dailyCap.signum() > 0;
 
         Map<Long, TaskSchedule> scheduleByTask = new HashMap<>();
-        BigDecimal nearPct = null;
-        BigDecimal overallPct = null;
+        BigDecimal workloadPct = null;
         WorkloadLevel level;
         int predictedLate = 0;
 
@@ -195,17 +185,12 @@ public class WorkloadService {
             List<Task> workable = laneTasks.stream().filter(WorkloadService::isWorkable).toList();
             LaneSimulation sim = scheduleSimulator.simulate(orderLane(workable, dailyCap), dailyCap, today);
             for (TaskSchedule ts : sim.schedules()) scheduleByTask.put(ts.taskId(), ts);
-            nearPct = sim.nearTermPercent();
-            overallPct = sim.overallPercent();
+            workloadPct = sim.workloadPercent();
             // Slip predictions that are NOT already overdue (overdue is its own badge).
             predictedLate = (int) sim.schedules().stream()
-                    .filter(TaskSchedule::willSlip)
-                    .filter(ts -> {
-                        LocalDate due = dueDateOf(ts.taskId(), laneTasks);
-                        return due != null && !due.isBefore(today);
-                    })
+                    .filter(ts -> isFutureSlip(ts, laneTasks, today))
                     .count();
-            level = laneBadge(overdueCount, predictedLate, nearPct);
+            level = laneBadge(overdueCount, predictedLate, workloadPct);
         }
 
         List<TaskWorkloadItem> taskItems = laneTasks.stream()
@@ -220,12 +205,11 @@ public class WorkloadService {
                 .allocatedEffortPercent(alloc)
                 .dailyCapacityHours(dailyCap)
                 .workloadLevel(level)
-                .nearTermPercent(nearPct)
-                .overallPercent(overallPct)
+                .workloadPercent(workloadPct)
                 .predictedLateTaskCount(predictedLate)
                 .build();
 
-        return new LaneResult(item, level, nearPct, overallPct,
+        return new LaneResult(item, level, workloadPct,
                 overdueCount, predictedLate, unestimatedCount, taskItems);
     }
 
@@ -237,11 +221,22 @@ public class WorkloadService {
                 .orElse(null);
     }
 
-    private static WorkloadLevel laneBadge(int overdueCount, int predictedLate, BigDecimal nearPct) {
+    /**
+     * A future slip: the simulation predicts the task misses its deadline, and that deadline
+     * is today or later. Already-overdue tasks (due date in the past) are excluded here — they
+     * are surfaced by the OVERDUE badge instead, so we don't double-count them as WILL_SLIP.
+     */
+    private static boolean isFutureSlip(TaskSchedule ts, List<Task> laneTasks, LocalDate today) {
+        if (!ts.willSlip()) return false;
+        LocalDate due = dueDateOf(ts.taskId(), laneTasks);
+        return due != null && !due.isBefore(today);
+    }
+
+    private static WorkloadLevel laneBadge(int overdueCount, int predictedLate, BigDecimal workloadPct) {
         if (overdueCount > 0) return WorkloadLevel.OVERDUE;
         if (predictedLate > 0) return WorkloadLevel.WILL_SLIP;
-        if (nearPct.compareTo(TIGHT_THRESHOLD) >= 0) return WorkloadLevel.TIGHT;
-        if (nearPct.compareTo(AVAILABLE_THRESHOLD) < 0) return WorkloadLevel.AVAILABLE;
+        if (workloadPct.compareTo(TIGHT_THRESHOLD) >= 0) return WorkloadLevel.TIGHT;
+        if (workloadPct.compareTo(AVAILABLE_THRESHOLD) < 0) return WorkloadLevel.AVAILABLE;
         return WorkloadLevel.HEALTHY;
     }
 
@@ -269,8 +264,7 @@ public class WorkloadService {
     // ─── per-member aggregation ───────────────────────────────────────────────
 
     private record MemberWorkload(WorkloadLevel level,
-                                  BigDecimal nearTermPercent,
-                                  BigDecimal overallPercent,
+                                  BigDecimal workloadPercent,
                                   int activeTaskCount,
                                   int overdueTaskCount,
                                   int predictedLateTaskCount,
@@ -312,8 +306,7 @@ public class WorkloadService {
         List<ProjectAllocationItem> projectItems = new ArrayList<>();
         List<TaskWorkloadItem> taskItems = new ArrayList<>();
         WorkloadLevel aggregate = null;
-        BigDecimal nearMax = null;
-        BigDecimal overallMax = null;
+        BigDecimal workloadMax = null;
         int overdueTotal = 0;
         int lateTotal = 0;
         int unestimatedTotal = 0;
@@ -331,14 +324,12 @@ public class WorkloadService {
             if (aggregate == null || severityRank(lane.level()) < severityRank(aggregate)) {
                 aggregate = lane.level();
             }
-            nearMax = maxNullable(nearMax, lane.nearTermPercent());
-            overallMax = maxNullable(overallMax, lane.overallPercent());
+            workloadMax = maxNullable(workloadMax, lane.workloadPercent());
         }
 
         return new MemberWorkload(
                 aggregate != null ? aggregate : WorkloadLevel.UNDEFINED,
-                nearMax != null ? nearMax : BigDecimal.ZERO,
-                overallMax != null ? overallMax : BigDecimal.ZERO,
+                workloadMax != null ? workloadMax : BigDecimal.ZERO,
                 activeTasks.size(), overdueTotal, lateTotal, unestimatedTotal,
                 memberships.size(), projectItems, taskItems);
     }
@@ -350,23 +341,6 @@ public class WorkloadService {
     }
 
     // ─── public read endpoints ────────────────────────────────────────────────
-
-    public List<WorkloadSnapshotResponse> getTeamWorkload(LocalDate date) {
-        LocalDate targetDate = date != null ? date : LocalDate.now();
-        return enrichSnapshots(workloadSnapshotRepository.findBySnapshotDate(targetDate));
-    }
-
-    public List<WorkloadSnapshotResponse> getUserWorkloadHistory(Long userId) {
-        return enrichSnapshots(workloadSnapshotRepository.findByUserIdOrderByDateDesc(userId));
-    }
-
-    public List<BurnoutLogResponse> getBurnoutLogs() {
-        return enrichBurnoutLogs(burnoutLogRepository.findAll());
-    }
-
-    public List<BurnoutLogResponse> getUserBurnoutHistory(Long userId) {
-        return enrichBurnoutLogs(burnoutLogRepository.findByUserIdOrderByEvaluatedAtDesc(userId));
-    }
 
     /** Real-time workload for all active participants of a project. */
     public List<MemberWorkloadResponse> getProjectMembersWorkload(Long projectId) {
@@ -393,7 +367,7 @@ public class WorkloadService {
                     List<ProjectAllocationItem> thisProject = mw.projectItems().stream()
                             .filter(i -> projectId.equals(i.getProjectId()))
                             .toList();
-                    return toMemberResponse(user, mw, today, thisProject, null);
+                    return toMemberResponse(user, mw, thisProject, null);
                 })
                 .toList();
     }
@@ -404,41 +378,64 @@ public class WorkloadService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         LocalDate today = LocalDate.now();
         MemberWorkload mw = computeMemberWorkload(user, today);
-        return toMemberResponse(user, mw, today, mw.projectItems(), mw.taskItems());
+        return toMemberResponse(user, mw, mw.projectItems(), mw.taskItems());
     }
 
-    @Transactional
-    public WorkloadSnapshotResponse takeSnapshot(Long userId) {
+    /**
+     * Real-time workload of every member across the projects the given manager manages
+     * ({@code managerId = managerId}), deduplicated — a member in several of the manager's
+     * projects appears exactly once. The manager themselves is excluded (this is their team).
+     *
+     * <p>Collapses the FE's per-member fan-out of {@code GET /workload/users/{id}/realtime}
+     * into a single request. Each element matches {@link #getUserWorkloadRealtime} — aggregate
+     * badge, per-project lanes, and the task breakdown — computed over each member's full set of
+     * projects (not only the manager's), so it reflects their true total load.
+     */
+    public List<MemberWorkloadResponse> getManagedMembersWorkload(Long managerId) {
+        List<Long> projectIds = projectRepository.findByManagerId(managerId)
+                .stream().map(Project::getId).toList();
+        if (projectIds.isEmpty()) return List.of();
+
         LocalDate today = LocalDate.now();
+
+        LinkedHashSet<Long> userIds = new LinkedHashSet<>();
+        projectMemberRepository.findActiveMembersByProjectIdIn(projectIds)
+                .forEach(m -> userIds.add(m.getUserId()));
+        userIds.remove(managerId); // their team, not themselves
+
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        List<MemberWorkloadResponse> result = new ArrayList<>();
+        for (Long uid : userIds) {
+            User user = userMap.get(uid);
+            if (user == null || Boolean.TRUE.equals(user.getIsDeleted())) {
+                continue;
+            }
+            MemberWorkload mw = computeMemberWorkload(user, today);
+            result.add(toMemberResponse(user, mw, mw.projectItems(), mw.taskItems()));
+        }
+        return result;
+    }
+
+    /**
+     * Daily overload check for one member: runs the v3 simulation and, when the
+     * member-level badge is OVERDUE or WILL_SLIP, sends an OVERLOAD_WARNING.
+     * Computes live — nothing is persisted.
+     */
+    @Transactional
+    public void evaluateOverload(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        MemberWorkload mw = computeMemberWorkload(user, today);
-
-        WorkloadSnapshot snapshot = workloadSnapshotRepository
-                .findByUserIdAndSnapshotDate(userId, today)
-                .orElseGet(WorkloadSnapshot::new);
-        snapshot.setUserId(userId);
-        snapshot.setSnapshotDate(today);
-        snapshot.setProjectCount(mw.projectCount());
-        snapshot.setActiveTaskCount(mw.activeTaskCount());
-        snapshot.setOverdueTaskCount(mw.overdueTaskCount());
-        snapshot.setPredictedLateTaskCount(mw.predictedLateTaskCount());
-        snapshot.setUnestimatedTaskCount(mw.unestimatedTaskCount());
-        snapshot.setNearTermPercent(mw.nearTermPercent());
-        snapshot.setOverallPercent(mw.overallPercent());
-        snapshot.setWorkloadLevel(mw.level());
-
-        WorkloadSnapshot saved = workloadSnapshotRepository.save(snapshot);
+        MemberWorkload mw = computeMemberWorkload(user, LocalDate.now());
 
         if (mw.level() == WorkloadLevel.OVERDUE || mw.level() == WorkloadLevel.WILL_SLIP) {
             notificationService.send(
                     userId, NotificationType.OVERLOAD_WARNING,
-                    NotificationMessages.overloadWarning(mw.overallPercent().toPlainString()),
-                    "WORKLOAD", saved.getId());
+                    NotificationMessages.overloadWarning(mw.workloadPercent().toPlainString()),
+                    "WORKLOAD", userId);
         }
-
-        return toSnapshotResponse(saved, user.getFullName());
     }
 
     // ─── what-if scheduling (single member, single project lane) ──────────────
@@ -483,8 +480,7 @@ public class WorkloadService {
 
         Map<Long, TaskSchedule> scheduleByTask = new HashMap<>();
         WorkloadLevel level;
-        BigDecimal nearPct = null;
-        BigDecimal overallPct = null;
+        BigDecimal workloadPct = null;
         int predictedLate = 0;
 
         if (ctx.dailyCap() == null) {
@@ -494,8 +490,7 @@ public class WorkloadService {
         } else {
             LaneSimulation sim = scheduleSimulator.simulate(ordered, ctx.dailyCap(), today);
             for (TaskSchedule ts : sim.schedules()) scheduleByTask.put(ts.taskId(), ts);
-            nearPct = sim.nearTermPercent();
-            overallPct = sim.overallPercent();
+            workloadPct = sim.workloadPercent();
             predictedLate = (int) sim.schedules().stream()
                     .filter(TaskSchedule::willSlip)
                     .filter(ts -> {
@@ -503,7 +498,7 @@ public class WorkloadService {
                         return due != null && !due.isBefore(today);
                     })
                     .count();
-            level = laneBadge(overdueCount, predictedLate, nearPct);
+            level = laneBadge(overdueCount, predictedLate, workloadPct);
         }
 
         Map<Long, TaskWorkloadItem> itemById = new HashMap<>();
@@ -527,8 +522,7 @@ public class WorkloadService {
                 .allocatedEffortPercent(ctx.alloc())
                 .dailyCapacityHours(ctx.dailyCap())
                 .workloadLevel(level)
-                .nearTermPercent(nearPct)
-                .overallPercent(overallPct)
+                .workloadPercent(workloadPct)
                 .predictedLateTaskCount(predictedLate)
                 .savedOrder(savedOrder)
                 .tasks(items)
@@ -636,11 +630,10 @@ public class WorkloadService {
                 .anyMatch(ts -> ts.taskId().equals(CANDIDATE_TASK_ID) && ts.willSlip());
 
         return b
-                .levelBefore(laneBadge(overdueCount, lateBefore, before.nearTermPercent()))
-                .levelAfter(laneBadge(overdueCount, lateAfter, after.nearTermPercent()))
-                .overallPercentBefore(before.overallPercent())
-                .overallPercentAfter(after.overallPercent())
-                .nearTermPercentAfter(after.nearTermPercent())
+                .levelBefore(laneBadge(overdueCount, lateBefore, before.workloadPercent()))
+                .levelAfter(laneBadge(overdueCount, lateAfter, after.workloadPercent()))
+                .workloadPercentBefore(before.workloadPercent())
+                .workloadPercentAfter(after.workloadPercent())
                 .predictedLateTaskCountAfter(lateAfter)
                 .candidateTaskWillSlip(candidateSlips)
                 .introducesNewSlip(lateAfter > lateBefore)
@@ -660,77 +653,20 @@ public class WorkloadService {
 
     // ─── private mapping ──────────────────────────────────────────────────────
 
-    private MemberWorkloadResponse toMemberResponse(User user, MemberWorkload mw, LocalDate today,
+    private MemberWorkloadResponse toMemberResponse(User user, MemberWorkload mw,
                                                     List<ProjectAllocationItem> projectItems,
                                                     List<TaskWorkloadItem> taskItems) {
         return MemberWorkloadResponse.builder()
                 .userId(user.getId())
                 .userFullName(user.getFullName())
-                .weekStart(today)
-                .weekEnd(ScheduleSimulator.addWorkdays(today, ScheduleSimulator.NEAR_TERM_WORKDAYS - 1))
                 .workloadLevel(mw.level())
-                .nearTermPercent(mw.nearTermPercent())
-                .overallPercent(mw.overallPercent())
+                .workloadPercent(mw.workloadPercent())
                 .activeTaskCount(mw.activeTaskCount())
                 .overdueTaskCount(mw.overdueTaskCount())
                 .predictedLateTaskCount(mw.predictedLateTaskCount())
                 .unestimatedTaskCount(mw.unestimatedTaskCount())
                 .projectAllocations(projectItems)
                 .tasks(taskItems)
-                .build();
-    }
-
-    private List<WorkloadSnapshotResponse> enrichSnapshots(List<WorkloadSnapshot> snapshots) {
-        if (snapshots.isEmpty()) return List.of();
-        Map<Long, String> names = userRepository.findAllById(
-                snapshots.stream().map(WorkloadSnapshot::getUserId).distinct().toList()
-        ).stream().collect(Collectors.toMap(User::getId, User::getFullName));
-
-        return snapshots.stream()
-                .map(ws -> toSnapshotResponse(ws, names.get(ws.getUserId())))
-                .toList();
-    }
-
-    private List<BurnoutLogResponse> enrichBurnoutLogs(List<BurnoutLog> logs) {
-        if (logs.isEmpty()) return List.of();
-        Map<Long, String> names = userRepository.findAllById(
-                logs.stream().map(BurnoutLog::getUserId).distinct().toList()
-        ).stream().collect(Collectors.toMap(User::getId, User::getFullName));
-
-        return logs.stream()
-                .map(bl -> toBurnoutResponse(bl, names.get(bl.getUserId())))
-                .toList();
-    }
-
-    private WorkloadSnapshotResponse toSnapshotResponse(WorkloadSnapshot ws, String name) {
-        return WorkloadSnapshotResponse.builder()
-                .id(ws.getId())
-                .userId(ws.getUserId())
-                .userFullName(name)
-                .snapshotDate(ws.getSnapshotDate())
-                .projectCount(ws.getProjectCount())
-                .activeTaskCount(ws.getActiveTaskCount())
-                .overdueTaskCount(ws.getOverdueTaskCount())
-                .predictedLateTaskCount(ws.getPredictedLateTaskCount())
-                .unestimatedTaskCount(ws.getUnestimatedTaskCount())
-                .nearTermPercent(ws.getNearTermPercent())
-                .overallPercent(ws.getOverallPercent())
-                .workloadLevel(ws.getWorkloadLevel())
-                .build();
-    }
-
-    private BurnoutLogResponse toBurnoutResponse(BurnoutLog bl, String name) {
-        return BurnoutLogResponse.builder()
-                .id(bl.getId())
-                .userId(bl.getUserId())
-                .userFullName(name)
-                .evaluatedAt(bl.getEvaluatedAt())
-                .riskScore(bl.getRiskScore())
-                .riskLevel(bl.getRiskLevel())
-                .overdueTaskCount(bl.getOverdueTaskCount())
-                .capacityUsedAvg(bl.getCapacityUsedAvg())
-                .isAlertSent(bl.getIsAlertSent())
-                .note(bl.getNote())
                 .build();
     }
 }
