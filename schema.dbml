@@ -120,7 +120,7 @@ Table tasks {
   title varchar(300) [not null, note: 'Task title']
   description text [note: 'Detailed description of the work to be done']
   type varchar(50) [not null, default: 'FEATURE', note: 'Type: FEATURE / BUG / RESEARCH']
-  status varchar(50) [not null, default: 'TODO', note: 'Status: TODO / IN_PROGRESS / IN_REVIEW / DONE / CANCELLED']
+  status varchar(50) [not null, default: 'TODO', note: 'Status: TODO / IN_PROGRESS / DONE / CANCELLED']
   priority varchar(20) [not null, default: 'MEDIUM', note: 'Priority: LOW / MEDIUM / HIGH / CRITICAL']
   estimated_hours decimal(6,1) [note: 'Estimated hours to complete']
   actual_hours decimal(6,1) [note: 'Actual hours worked (aggregated from time_logs)']

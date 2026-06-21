@@ -17,11 +17,12 @@ import java.util.Map;
  * Workload v3 engine — single-resource serial scheduling simulation.
  *
  * A member is modelled as one machine with a fixed daily sub-capacity per
- * project lane. Tasks are jobs with remaining effort, a release date
- * (startDate) and a deadline (dueDate). The simulation pours capacity, day by
- * day, into the highest-priority *released* task until it is done, then moves
- * to the next — producing a projected finish date for every task and a
- * per-task slip prediction.
+ * project lane. Tasks are jobs with remaining effort and a deadline (dueDate).
+ * {@code startDate} is informational only — it is NOT a release constraint, so
+ * every unfinished task is available from today. The simulation pours capacity,
+ * day by day, into the next task in order until it is done, then moves to the
+ * next — producing a projected finish date for every task and a per-task slip
+ * prediction.
  *
  * Ordering is a *forecasting hint*: {@link #simulate} treats the supplied
  * order as a priority list, not a rigid sequence. It is forward-only and never
@@ -41,7 +42,7 @@ public class ScheduleSimulator {
 
     // ─── input / output records ───────────────────────────────────────────────
 
-    /** A task as seen by the simulator. {@code startDate} null → released today. */
+    /** A task as seen by the simulator. {@code startDate} is informational only — it does not gate scheduling. */
     public record ScheduledTask(Long taskId, Long projectId, BigDecimal remaining,
                                 LocalDate startDate, LocalDate dueDate, TaskPriority priority) {}
 
@@ -165,24 +166,14 @@ public class ScheduleSimulator {
         LocalDate hardStop = today.plusYears(MAX_HORIZON_YEARS);
 
         while (rem.values().stream().anyMatch(h -> h > EPS) && !cursor.isAfter(hardStop)) {
+            // startDate is NOT a release constraint in this domain — a member may work a task
+            // before its planned start. So every unfinished task is available from today; we
+            // simply take the next one in the supplied (ATC / custom) order.
             ScheduledTask next = null;
             for (ScheduledTask t : ordered) {
-                if (rem.get(t.taskId()) <= EPS) continue;
-                if (t.startDate() == null || !t.startDate().isAfter(cursor)) { next = t; break; }
+                if (rem.get(t.taskId()) > EPS) { next = t; break; }
             }
-
-            if (next == null) {
-                // Everything left is released only in the future — jump the cursor.
-                LocalDate earliest = null;
-                for (ScheduledTask t : ordered) {
-                    if (rem.get(t.taskId()) <= EPS || t.startDate() == null) continue;
-                    if (earliest == null || t.startDate().isBefore(earliest)) earliest = t.startDate();
-                }
-                if (earliest == null) break;
-                cursor = firstWorkdayOnOrAfter(earliest);
-                dayLeft = subCap;
-                continue;
-            }
+            if (next == null) break;
 
             projStart.putIfAbsent(next.taskId(), cursor);
             double work = Math.min(dayLeft, rem.get(next.taskId()));

@@ -57,11 +57,11 @@ public final class NotificationMessages {
         );
     }
 
-    public static NotificationContent overloadWarning(String utilizationPercent) {
+    public static NotificationContent overloadWarning(int atRiskCount) {
         return new NotificationContent(
-                "Workload overload warning",
-                "This week's workload has reached " + utilizationPercent
-                        + "% of capacity. Please review and adjust your workload."
+                "Deadline risk warning",
+                atRiskCount + " of your task(s) are projected to miss their deadline. "
+                        + "Please review and adjust your workload."
         );
     }
 }

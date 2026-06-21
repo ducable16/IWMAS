@@ -77,20 +77,23 @@ class ScheduleSimulatorTest {
     }
 
     @Test
-    void futureStartDateIsRespected() {
+    void futureStartDateIsIgnored() {
+        // startDate is not a release constraint — the task is worked from today regardless.
         LocalDate start = ScheduleSimulator.addWorkdays(MON, 5);
         ScheduledTask t = task(1, 8, start, ScheduleSimulator.addWorkdays(MON, 9));
         LaneSimulation result = sim.simulate(List.of(t), CAP_8H, MON);
 
         TaskSchedule ts = scheduleOf(result, 1);
-        assertEquals(start, ts.projectedStart(), "task cannot be worked before its release date");
+        assertEquals(MON, ts.projectedStart(), "future startDate does not delay the work");
+        assertEquals(MON, ts.projectedFinish());
         assertFalse(ts.willSlip());
     }
 
     @Test
-    void futureStartTaskThatCannotFitItsWindowSlips() {
-        // T1 fills today; T2 releases in 5 workdays, due in 7, needs 40h (5 workdays)
-        // but only has a 3-workday window → slips. The closed-form would miss this.
+    void futureStartTaskIsScheduledFromTodayNotItsStart() {
+        // Under the old release-date model T2 would wait until its +5 start and slip.
+        // Now both are available from today: T1 fills MON, T2 (40h) runs from the next
+        // workday and finishes within its +7 due → no slip.
         ScheduledTask t1 = task(1, 8, MON, ScheduleSimulator.addWorkdays(MON, 1));
         ScheduledTask t2 = task(2, 40, ScheduleSimulator.addWorkdays(MON, 5),
                 ScheduleSimulator.addWorkdays(MON, 7));
@@ -98,8 +101,8 @@ class ScheduleSimulatorTest {
 
         assertFalse(scheduleOf(result, 1).willSlip());
         TaskSchedule s2 = scheduleOf(result, 2);
-        assertTrue(s2.willSlip());
-        assertEquals(ScheduleSimulator.addWorkdays(MON, 5), s2.projectedStart());
+        assertEquals(MON.plusDays(1), s2.projectedStart(), "started the workday after T1, not at its +5 start");
+        assertFalse(s2.willSlip(), "40h fits the window when worked from today");
     }
 
     @Test

@@ -17,6 +17,7 @@ import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
 import com.iwas.workload.dto.CandidateWorkloadImpact;
 import com.iwas.workload.dto.MemberWorkloadResponse;
+import com.iwas.workload.enums.LoadLevel;
 import com.iwas.workload.enums.WorkloadLevel;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -109,29 +110,48 @@ class WorkloadServiceTest {
     }
 
     @Test
-    void realtimeWorkloadIsAvailableWhenLightlyLoaded() {
+    void realtimeLoadIsAvailableWhenLightlyLoaded() {
         LocalDate today = LocalDate.now();
         Task light = task(1, today, ScheduleSimulator.addWorkdays(today, 9), BigDecimal.valueOf(8));
         stubMemberLookups(List.of(light), membership(100));
 
         MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
 
-        assertEquals(WorkloadLevel.AVAILABLE, res.getWorkloadLevel());
+        // 8h at 100% (8h/day) → 1 workday of backlog → AVAILABLE; nothing at risk.
+        assertEquals(LoadLevel.AVAILABLE, res.getLoadLevel());
         assertEquals(0, res.getOverdueTaskCount());
         assertEquals(0, res.getPredictedLateTaskCount());
+        assertEquals(0, res.getAtRiskCount());
         assertEquals(1, res.getActiveTaskCount());
     }
 
     @Test
-    void realtimeWorkloadIsOverdueWhenATaskIsPastDue() {
+    void overdueTaskShowsAsRiskNotLoad() {
+        // The two axes are independent: 8h of work is light VOLUME (AVAILABLE load),
+        // but a past-due task is a RISK signal (overdue / at-risk).
         LocalDate today = LocalDate.now();
         Task overdue = task(1, today.minusDays(30), today.minusDays(15), BigDecimal.valueOf(8));
         stubMemberLookups(List.of(overdue), membership(100));
 
         MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
 
-        assertEquals(WorkloadLevel.OVERDUE, res.getWorkloadLevel());
+        assertEquals(LoadLevel.AVAILABLE, res.getLoadLevel());
         assertEquals(1, res.getOverdueTaskCount());
+        assertEquals(1, res.getAtRiskCount());
+    }
+
+    @Test
+    void heavyBacklogIsOverloadedEvenWithFarDeadlines() {
+        // 100h at 100% (8h/day) → 12.5 workdays of backlog → OVERLOADED VOLUME,
+        // but the deadline is far so nothing slips → RISK stays clean.
+        LocalDate today = LocalDate.now();
+        Task big = task(1, today, ScheduleSimulator.addWorkdays(today, 59), BigDecimal.valueOf(100));
+        stubMemberLookups(List.of(big), membership(100));
+
+        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
+
+        assertEquals(LoadLevel.OVERLOADED, res.getLoadLevel());
+        assertEquals(0, res.getAtRiskCount(), "far deadline → no slip despite heavy volume");
     }
 
     @Test
@@ -145,7 +165,7 @@ class WorkloadServiceTest {
 
         MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
 
-        assertEquals(WorkloadLevel.AVAILABLE, res.getWorkloadLevel(),
+        assertEquals(LoadLevel.AVAILABLE, res.getLoadLevel(),
                 "reported 2h remaining should drive load, not the 80h estimate");
     }
 
