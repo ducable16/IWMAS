@@ -1,6 +1,6 @@
 package com.iwas.workload.dto;
 
-import com.iwas.workload.enums.WorkloadLevel;
+import com.iwas.workload.enums.LoadLevel;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -11,17 +11,18 @@ import java.math.BigDecimal;
  * a "what-if" the assignee recommender can score availability with.
  *
  * Computed by re-running the schedule simulation with the candidate task
- * appended; nothing is persisted.
+ * appended; nothing is persisted. {@code loadLevel*}/{@code backlogDays*} are the
+ * volume axis before/after; the slip fields are the deadline-risk axis.
  */
 @Getter
 @Builder
 public class CandidateWorkloadImpact {
     private Long userId;
     private Long projectId;
-    private WorkloadLevel levelBefore;
-    private WorkloadLevel levelAfter;
-    private BigDecimal workloadPercentBefore;
-    private BigDecimal workloadPercentAfter;
+    private LoadLevel loadLevelBefore;
+    private LoadLevel loadLevelAfter;
+    private BigDecimal backlogDaysBefore;
+    private BigDecimal backlogDaysAfter;
     private Integer predictedLateTaskCountAfter;
     /** The candidate task itself is projected to miss its own due date. */
     private boolean candidateTaskWillSlip;

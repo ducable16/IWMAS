@@ -74,10 +74,6 @@ public enum ErrorCode {
     TASK_DATES_REQUIRED(5006, "At least one of start date or due date is required", HttpStatus.BAD_REQUEST),
     TASK_ASSIGNEE_SKILL_NOT_MET(5007, "Assignee does not meet the required skill level for this task", HttpStatus.BAD_REQUEST),
 
-    // --- 6xxx: Time Logs ---
-    TIME_LOG_NOT_FOUND(6001, "Time log not found", HttpStatus.NOT_FOUND),
-    TIME_LOG_ALREADY_EXISTS(6002, "Time log already exists for this task/user/date", HttpStatus.CONFLICT),
-
     // --- 7xxx: Notifications ---
     NOTIFICATION_NOT_FOUND(7001, "Notification not found", HttpStatus.NOT_FOUND),
 

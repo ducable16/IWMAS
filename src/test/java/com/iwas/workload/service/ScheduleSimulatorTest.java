@@ -152,26 +152,4 @@ class ScheduleSimulatorTest {
         List<ScheduledTask> ordered = ScheduleSimulator.eddOrder(List.of(low, critical));
         assertEquals(2, ordered.get(0).taskId(), "same due date → CRITICAL before LOW");
     }
-
-    @Test
-    void tightnessIsRemainingOverCapacity() {
-        // 20h due 5 workdays out (today + 4 workdays inclusive), capacity 8h/day → 20/40 = 50%.
-        ScheduledTask t = task(1, 20, MON, ScheduleSimulator.addWorkdays(MON, 4));
-        LaneSimulation result = sim.simulate(List.of(t), CAP_8H, MON);
-
-        assertEquals(0, result.workloadPercent().compareTo(BigDecimal.valueOf(50.00)));
-    }
-
-    @Test
-    void workloadPercentCountsFarDeadlines() {
-        // A small near task plus a huge far-deadline task. workloadPercent spans ALL
-        // deadlines, so the far cluster (4+200=204h over 60 workdays × 8h = 480) drives it
-        // to 42.50% — well above the near task's own 4/24 = 16.67%.
-        ScheduledTask near = task(1, 4, MON, ScheduleSimulator.addWorkdays(MON, 2));
-        ScheduledTask far = task(2, 200, MON, ScheduleSimulator.addWorkdays(MON, 59));
-        LaneSimulation result = sim.simulate(List.of(near, far), CAP_8H, MON);
-
-        assertEquals(0, result.workloadPercent().compareTo(BigDecimal.valueOf(42.50)),
-                "the far deadline cluster is included in the single workload metric");
-    }
 }

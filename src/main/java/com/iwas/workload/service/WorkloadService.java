@@ -22,7 +22,6 @@ import com.iwas.workload.dto.MemberWorkloadResponse;
 import com.iwas.workload.dto.MemberWorkloadResponse.ProjectAllocationItem;
 import com.iwas.workload.dto.MemberWorkloadResponse.TaskWorkloadItem;
 import com.iwas.workload.enums.LoadLevel;
-import com.iwas.workload.enums.WorkloadLevel;
 import com.iwas.workload.service.ScheduleSimulator.LaneSimulation;
 import com.iwas.workload.service.ScheduleSimulator.ScheduledTask;
 import com.iwas.workload.service.ScheduleSimulator.TaskSchedule;
@@ -53,9 +52,8 @@ import java.util.stream.Collectors;
  * Per lane, {@link ScheduleSimulator} forecasts task finish dates and slip
  * risk; the per-member badge is the worst lane badge.
  *
- * A task's outstanding work is {@code reportedRemainingHours} when the member
- * has logged it, otherwise {@code estimatedHours}. The model derives load
- * from this single number plus the schedule — it never re-reads actualHours.
+ * A task's outstanding work is {@code estimatedHours}. The model derives load
+ * from this single number plus the schedule.
  */
 @Service
 @RequiredArgsConstructor
@@ -73,41 +71,31 @@ public class WorkloadService {
     // Dashboard "Workload" axis — backlog depth thresholds, in workdays of queued work.
     private static final BigDecimal LOAD_BUSY_DAYS = BigDecimal.valueOf(5);        // ≤5 workdays → AVAILABLE
     private static final BigDecimal LOAD_OVERLOADED_DAYS = BigDecimal.valueOf(10);  // ≤10 → BUSY, else OVERLOADED
-    // Used only by the (kept) /me/schedule + recommender paths, which still report tightness.
-    private static final BigDecimal TIGHT_THRESHOLD = BigDecimal.valueOf(85);
-    private static final BigDecimal AVAILABLE_THRESHOLD = BigDecimal.valueOf(50);
 
     // ─── task helpers ─────────────────────────────────────────────────────────
 
-    /** Outstanding effort: member-reported remaining if logged, else the estimate. */
+    /** Outstanding effort: the task's estimate. */
     static BigDecimal resolveRemaining(Task t) {
-        return t.getReportedRemainingHours() != null
-                ? t.getReportedRemainingHours() : t.getEstimatedHours();
+        return t.getEstimatedHours();
     }
 
-    /** A task with no usable estimate and no reported remaining — load is unknown. */
+    /** A task with no usable estimate — load is unknown. */
     static boolean isUnestimated(Task t) {
-        return t.getReportedRemainingHours() == null
-                && (t.getEstimatedHours() == null || t.getEstimatedHours().signum() <= 0);
-    }
-
-    /** The member has logged remaining = 0 — work is effectively complete. */
-    private static boolean isEffectivelyDone(Task t) {
-        return t.getReportedRemainingHours() != null && t.getReportedRemainingHours().signum() <= 0;
+        return t.getEstimatedHours() == null || t.getEstimatedHours().signum() <= 0;
     }
 
     /** Has positive outstanding effort — participates in the simulation. */
     private static boolean isWorkable(Task t) {
-        BigDecimal r = resolveRemaining(t);
-        return r != null && r.signum() > 0;
+        BigDecimal est = t.getEstimatedHours();
+        return est != null && est.signum() > 0;
     }
 
     private static boolean isOverdue(Task t, LocalDate today) {
-        return t.getDueDate() != null && t.getDueDate().isBefore(today) && !isEffectivelyDone(t);
+        return t.getDueDate() != null && t.getDueDate().isBefore(today);
     }
 
     private static ScheduledTask toScheduledTask(Task t) {
-        return new ScheduledTask(t.getId(), t.getProjectId(), resolveRemaining(t),
+        return new ScheduledTask(t.getId(), t.getProjectId(), t.getEstimatedHours(),
                 t.getStartDate(), t.getDueDate(), t.getPriority());
     }
 
@@ -241,20 +229,12 @@ public class WorkloadService {
     /**
      * A future slip: the simulation predicts the task misses its deadline, and that deadline
      * is today or later. Already-overdue tasks (due date in the past) are excluded here — they
-     * are surfaced by the OVERDUE badge instead, so we don't double-count them as WILL_SLIP.
+     * are counted by {@code overdueCount} instead, so we don't double-count them as predicted-late.
      */
     private static boolean isFutureSlip(TaskSchedule ts, List<Task> laneTasks, LocalDate today) {
         if (!ts.willSlip()) return false;
         LocalDate due = dueDateOf(ts.taskId(), laneTasks);
         return due != null && !due.isBefore(today);
-    }
-
-    private static WorkloadLevel laneBadge(int overdueCount, int predictedLate, BigDecimal workloadPct) {
-        if (overdueCount > 0) return WorkloadLevel.OVERDUE;
-        if (predictedLate > 0) return WorkloadLevel.WILL_SLIP;
-        if (workloadPct.compareTo(TIGHT_THRESHOLD) >= 0) return WorkloadLevel.TIGHT;
-        if (workloadPct.compareTo(AVAILABLE_THRESHOLD) < 0) return WorkloadLevel.AVAILABLE;
-        return WorkloadLevel.HEALTHY;
     }
 
     private TaskWorkloadItem toTaskItem(Task t, LocalDate today, TaskSchedule sched) {
@@ -267,7 +247,7 @@ public class WorkloadService {
                 .priority(t.getPriority())
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
-                .remainingHours(unestimated ? null : resolveRemaining(t))
+                .remainingHours(unestimated ? null : t.getEstimatedHours())
                 .executionSeq(t.getExecutionSeq())
                 .projectedStartDate(sched != null ? sched.projectedStart() : null)
                 .projectedFinishDate(sched != null ? sched.projectedFinish() : null)
@@ -508,27 +488,28 @@ public class WorkloadService {
                                                          boolean savedOrder, LocalDate today) {
         int overdueCount = (int) ctx.laneTasks().stream().filter(t -> isOverdue(t, today)).count();
 
+        BigDecimal dailyCap = ctx.dailyCap();
+        BigDecimal backlogHours = ctx.workable().stream()
+                .map(WorkloadService::resolveRemaining)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         Map<Long, TaskSchedule> scheduleByTask = new HashMap<>();
-        WorkloadLevel level;
-        BigDecimal workloadPct = null;
+        BigDecimal backlogDays = null;
+        LoadLevel loadLevel;
         int predictedLate = 0;
 
-        if (ctx.dailyCap() == null) {
-            level = WorkloadLevel.UNDEFINED;
-        } else if (ctx.dailyCap().signum() <= 0) {
-            level = WorkloadLevel.BLOCKED;
+        if (dailyCap == null) {
+            loadLevel = LoadLevel.UNDEFINED;
+        } else if (dailyCap.signum() <= 0) {
+            loadLevel = LoadLevel.BLOCKED;
         } else {
-            LaneSimulation sim = scheduleSimulator.simulate(ordered, ctx.dailyCap(), today);
+            backlogDays = backlogHours.divide(dailyCap, 2, RoundingMode.HALF_UP);
+            loadLevel = loadLevelFor(backlogDays);
+            LaneSimulation sim = scheduleSimulator.simulate(ordered, dailyCap, today);
             for (TaskSchedule ts : sim.schedules()) scheduleByTask.put(ts.taskId(), ts);
-            workloadPct = sim.workloadPercent();
             predictedLate = (int) sim.schedules().stream()
-                    .filter(TaskSchedule::willSlip)
-                    .filter(ts -> {
-                        LocalDate due = dueDateOf(ts.taskId(), ctx.laneTasks());
-                        return due != null && !due.isBefore(today);
-                    })
+                    .filter(ts -> isFutureSlip(ts, ctx.laneTasks(), today))
                     .count();
-            level = laneBadge(overdueCount, predictedLate, workloadPct);
         }
 
         Map<Long, TaskWorkloadItem> itemById = new HashMap<>();
@@ -550,9 +531,11 @@ public class WorkloadService {
                 .projectId(ctx.project().getId())
                 .projectName(ctx.project().getName())
                 .allocatedEffortPercent(ctx.alloc())
-                .dailyCapacityHours(ctx.dailyCap())
-                .workloadLevel(level)
-                .workloadPercent(workloadPct)
+                .dailyCapacityHours(dailyCap)
+                .backlogHours(backlogHours)
+                .backlogDays(backlogDays)
+                .loadLevel(loadLevel)
+                .overdueCount(overdueCount)
                 .predictedLateTaskCount(predictedLate)
                 .savedOrder(savedOrder)
                 .tasks(items)
@@ -626,14 +609,13 @@ public class WorkloadService {
         BigDecimal dailyCap = capacityOf(pmRow != null ? pmRow.getAllocatedEffortPercent() : null);
 
         List<Task> laneTasks = taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, userId);
-        int overdueCount = (int) laneTasks.stream().filter(t -> isOverdue(t, today)).count();
 
         CandidateWorkloadImpact.CandidateWorkloadImpactBuilder b = CandidateWorkloadImpact.builder()
                 .userId(userId).projectId(projectId);
 
         if (dailyCap == null || dailyCap.signum() <= 0) {
-            WorkloadLevel lvl = dailyCap == null ? WorkloadLevel.UNDEFINED : WorkloadLevel.BLOCKED;
-            return b.levelBefore(lvl).levelAfter(lvl)
+            LoadLevel lvl = dailyCap == null ? LoadLevel.UNDEFINED : LoadLevel.BLOCKED;
+            return b.loadLevelBefore(lvl).loadLevelAfter(lvl)
                     .candidateTaskWillSlip(true).introducesNewSlip(false)
                     .predictedLateTaskCountAfter(0).build();
         }
@@ -659,11 +641,19 @@ public class WorkloadService {
         boolean candidateSlips = after.schedules().stream()
                 .anyMatch(ts -> ts.taskId().equals(CANDIDATE_TASK_ID) && ts.willSlip());
 
+        // Volume axis: backlog (workdays) before / after adding the candidate's effort.
+        BigDecimal backlogHoursBefore = existing.stream()
+                .map(ScheduledTask::remaining).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal candidateHours = estimatedHours != null ? estimatedHours : BigDecimal.ZERO;
+        BigDecimal backlogDaysBefore = backlogHoursBefore.divide(dailyCap, 2, RoundingMode.HALF_UP);
+        BigDecimal backlogDaysAfter = backlogHoursBefore.add(candidateHours)
+                .divide(dailyCap, 2, RoundingMode.HALF_UP);
+
         return b
-                .levelBefore(laneBadge(overdueCount, lateBefore, before.workloadPercent()))
-                .levelAfter(laneBadge(overdueCount, lateAfter, after.workloadPercent()))
-                .workloadPercentBefore(before.workloadPercent())
-                .workloadPercentAfter(after.workloadPercent())
+                .loadLevelBefore(loadLevelFor(backlogDaysBefore))
+                .loadLevelAfter(loadLevelFor(backlogDaysAfter))
+                .backlogDaysBefore(backlogDaysBefore)
+                .backlogDaysAfter(backlogDaysAfter)
                 .predictedLateTaskCountAfter(lateAfter)
                 .candidateTaskWillSlip(candidateSlips)
                 .introducesNewSlip(lateAfter > lateBefore)

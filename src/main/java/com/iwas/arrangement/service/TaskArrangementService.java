@@ -166,18 +166,13 @@ public class TaskArrangementService {
     }
 
     private static ScheduledTask toScheduledTask(Task t) {
-        return new ScheduledTask(t.getId(), t.getProjectId(), resolveRemaining(t),
+        return new ScheduledTask(t.getId(), t.getProjectId(), t.getEstimatedHours(),
                 t.getStartDate(), t.getDueDate(), t.getPriority());
     }
 
-    private static BigDecimal resolveRemaining(Task t) {
-        return t.getReportedRemainingHours() != null
-                ? t.getReportedRemainingHours() : t.getEstimatedHours();
-    }
-
     private static boolean isWorkable(Task t) {
-        BigDecimal r = resolveRemaining(t);
-        return r != null && r.signum() > 0;
+        BigDecimal est = t.getEstimatedHours();
+        return est != null && est.signum() > 0;
     }
 
     /** Daily lane capacity in hours: 8h × allocation%; 0 when there is no allocation. */

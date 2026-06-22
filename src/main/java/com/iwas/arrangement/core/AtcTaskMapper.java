@@ -9,8 +9,7 @@ import java.time.LocalDate;
 
 /**
  * Reduces a domain {@link Task} to the three scheduling parameters the ATC
- * engine cares about. Outstanding work mirrors the workload v3 convention:
- * member-reported remaining hours when logged, otherwise the estimate.
+ * engine cares about.
  */
 public final class AtcTaskMapper {
 
@@ -27,10 +26,8 @@ public final class AtcTaskMapper {
         return new AtcTask(task.getId(), task.getPriority(), p, d);
     }
 
-    /** Outstanding effort in hours: reported remaining if logged, else the estimate; 0 if unknown. */
     private static double processingHours(Task task) {
-        BigDecimal remaining = task.getReportedRemainingHours() != null
-                ? task.getReportedRemainingHours() : task.getEstimatedHours();
+        BigDecimal remaining = task.getEstimatedHours();
         if (remaining == null || remaining.signum() <= 0) return 0.0;
         return remaining.doubleValue();
     }

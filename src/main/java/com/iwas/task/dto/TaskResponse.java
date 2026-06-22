@@ -24,7 +24,6 @@ public class TaskResponse {
     private TaskStatus status;
     private TaskPriority priority;
     private BigDecimal estimatedHours;
-    private BigDecimal actualHours;
     private LocalDate startDate;
     private LocalDate dueDate;
     private LocalDateTime completedAt;

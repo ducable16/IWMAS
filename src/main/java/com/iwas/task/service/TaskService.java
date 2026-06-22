@@ -662,7 +662,7 @@ public class TaskService {
                 .status(t.getStatus())
                 .priority(t.getPriority())
                 .estimatedHours(t.getEstimatedHours())
-                .actualHours(t.getActualHours())
+
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())
@@ -687,7 +687,7 @@ public class TaskService {
                 .status(t.getStatus())
                 .priority(t.getPriority())
                 .estimatedHours(t.getEstimatedHours())
-                .actualHours(t.getActualHours())
+
                 .startDate(t.getStartDate())
                 .dueDate(t.getDueDate())
                 .completedAt(t.getCompletedAt())

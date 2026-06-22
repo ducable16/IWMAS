@@ -123,7 +123,6 @@ Table tasks {
   status varchar(50) [not null, default: 'TODO', note: 'Status: TODO / IN_PROGRESS / DONE / CANCELLED']
   priority varchar(20) [not null, default: 'MEDIUM', note: 'Priority: LOW / MEDIUM / HIGH / CRITICAL']
   estimated_hours decimal(6,1) [note: 'Estimated hours to complete']
-  actual_hours decimal(6,1) [note: 'Actual hours worked (aggregated from time_logs)']
   start_date date [note: 'Start date']
   due_date date [note: 'Deadline']
   completed_at timestamp [note: 'Actual completion time']
@@ -158,27 +157,6 @@ Table task_activity {
   new_value text [note: 'Raw value after the change']
   actor_id bigint [not null, note: 'Who performed the action']
   created_at timestamp [not null, default: `now()`]
-}
-
-// ================================================================
-// Time Tracking
-// ================================================================
-
-Table time_logs {
-  id bigserial [pk, note: 'Primary key']
-  task_id bigint [not null, note: 'Which task the time was spent on']
-  user_id bigint [not null, note: 'Employee who logged the time']
-  log_date date [not null, note: 'Date the work was performed']
-  hours_spent decimal(4,1) [not null, note: 'Hours spent on this task on this date']
-  description text [note: 'What was done during this time']
-  created_at timestamp [not null, default: `now()`]
-  created_by bigint
-  updated_at timestamp
-  updated_by bigint
-
-  indexes {
-    (task_id, user_id, log_date) [unique, note: 'One log entry per task per user per day']
-  }
 }
 
 // ================================================================
@@ -242,12 +220,6 @@ Ref: task_skill_requirements.created_by > users.id
 // task_activity
 Ref: task_activity.task_id > tasks.id
 Ref: task_activity.actor_id > users.id
-
-// time_logs
-Ref: time_logs.task_id > tasks.id
-Ref: time_logs.user_id > users.id
-Ref: time_logs.created_by > users.id
-Ref: time_logs.updated_by > users.id
 
 // notifications
 Ref: notifications.recipient_id > users.id

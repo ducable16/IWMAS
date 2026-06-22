@@ -4,7 +4,6 @@ import com.iwas.task.enums.TaskPriority;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -50,9 +49,8 @@ public class ScheduleSimulator {
     public record TaskSchedule(Long taskId, LocalDate projectedStart, LocalDate projectedFinish,
                                boolean willSlip, long lateByWorkdays) {}
 
-    /** Per-lane result: forecasts plus the order-independent tightness metric. */
+    /** Per-lane result: per-task forecasts plus the count of tasks that will slip. */
     public record LaneSimulation(List<TaskSchedule> schedules,
-                                 BigDecimal workloadPercent,
                                  int predictedLateTaskCount) {}
 
     // ─── workday calendar ─────────────────────────────────────────────────────
@@ -134,7 +132,6 @@ public class ScheduleSimulator {
         }
 
         double subCap = subCapacityPerDay == null ? 0.0 : subCapacityPerDay.doubleValue();
-        double pct = tightness(workable, subCap, today);
 
         List<TaskSchedule> schedules;
         if (subCap <= EPS) {
@@ -149,9 +146,7 @@ public class ScheduleSimulator {
         }
 
         int late = (int) schedules.stream().filter(TaskSchedule::willSlip).count();
-        return new LaneSimulation(schedules,
-                BigDecimal.valueOf(pct).setScale(2, RoundingMode.HALF_UP),
-                late);
+        return new LaneSimulation(schedules, late);
     }
 
     private List<TaskSchedule> runForward(List<ScheduledTask> ordered,
@@ -206,34 +201,4 @@ public class ScheduleSimulator {
         return result;
     }
 
-    /**
-     * Order-independent tightness metric. For each task with a deadline,
-     * cumulative remaining work (sorted by deadline, overdue clamped to today)
-     * over the capacity available until that deadline. Returns the worst (max)
-     * ratio across all deadlines, in percent — a single demand/capacity load.
-     */
-    private double tightness(List<ScheduledTask> workable, double subCap, LocalDate today) {
-        if (subCap <= EPS) return 0.0;
-
-        List<ScheduledTask> withDue = new ArrayList<>();
-        for (ScheduledTask t : workable) {
-            if (t.dueDate() != null) withDue.add(t);
-        }
-        withDue.sort(Comparator.comparing(t -> effectiveDue(t.dueDate(), today)));
-
-        double cumulative = 0.0;
-        double workloadMax = 0.0;
-        for (ScheduledTask t : withDue) {
-            cumulative += t.remaining().doubleValue();
-            LocalDate due = effectiveDue(t.dueDate(), today);
-            long capDays = Math.max(1, countWorkdays(today, due));
-            double ratio = cumulative / (capDays * subCap) * 100.0;
-            workloadMax = Math.max(workloadMax, ratio);
-        }
-        return workloadMax;
-    }
-
-    private static LocalDate effectiveDue(LocalDate due, LocalDate today) {
-        return due.isBefore(today) ? today : due;
-    }
 }

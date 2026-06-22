@@ -18,7 +18,6 @@ import com.iwas.user.repository.UserRepository;
 import com.iwas.workload.dto.CandidateWorkloadImpact;
 import com.iwas.workload.dto.MemberWorkloadResponse;
 import com.iwas.workload.enums.LoadLevel;
-import com.iwas.workload.enums.WorkloadLevel;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -155,21 +154,6 @@ class WorkloadServiceTest {
     }
 
     @Test
-    void reportedRemainingOverridesEstimateForLoad() {
-        // Estimate 80h but member reported only 2h left → light load, not overloaded.
-        LocalDate today = LocalDate.now();
-        Task t = task(1, today, ScheduleSimulator.addWorkdays(today, 9), BigDecimal.valueOf(80));
-        t.setReportedRemainingHours(BigDecimal.valueOf(2));
-        t.setRemainingReportedDate(today);
-        stubMemberLookups(List.of(t), membership(100));
-
-        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
-
-        assertEquals(LoadLevel.AVAILABLE, res.getLoadLevel(),
-                "reported 2h remaining should drive load, not the 80h estimate");
-    }
-
-    @Test
     void candidateTaskImpactIsUndefinedWithoutAllocationRow() {
         when(projectRepo.findById(PROJECT_ID)).thenReturn(Optional.of(project()));
         when(userRepo.existsById(USER_ID)).thenReturn(true);
@@ -180,7 +164,7 @@ class WorkloadServiceTest {
                 USER_ID, PROJECT_ID, BigDecimal.valueOf(8),
                 LocalDate.now(), LocalDate.now().plusDays(7), TaskPriority.MEDIUM);
 
-        assertEquals(WorkloadLevel.UNDEFINED, impact.getLevelAfter());
+        assertEquals(LoadLevel.UNDEFINED, impact.getLoadLevelAfter());
     }
 
     @Test

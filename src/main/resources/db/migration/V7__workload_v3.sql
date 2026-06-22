@@ -7,9 +7,6 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reported_remaining_hours numeric(6, 1
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS remaining_reported_date date;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS execution_seq integer;
 
--- TimeLog: optional remaining-hours reported with the end-of-day entry.
-ALTER TABLE time_logs ADD COLUMN IF NOT EXISTS remaining_hours numeric(6, 1);
-
 -- workload_snapshots: schema reworked for the v3 model.
 ALTER TABLE workload_snapshots ADD COLUMN IF NOT EXISTS predicted_late_task_count integer DEFAULT 0;
 ALTER TABLE workload_snapshots ADD COLUMN IF NOT EXISTS near_term_percent numeric(7, 2);

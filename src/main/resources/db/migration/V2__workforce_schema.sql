@@ -165,7 +165,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     status varchar(50) NOT NULL DEFAULT 'TODO',
     priority varchar(20) NOT NULL DEFAULT 'MEDIUM',
     estimated_hours decimal(6,1),
-    actual_hours decimal(6,1),
     start_date date,
     due_date date,
     completed_at timestamp,
@@ -208,30 +207,6 @@ CREATE TABLE IF NOT EXISTS task_status_history (
 
 CREATE INDEX IF NOT EXISTS idx_tsh_task ON task_status_history(task_id);
 CREATE INDEX IF NOT EXISTS idx_tsh_changed_at ON task_status_history(changed_at);
-
--- ================================================================
--- Time Logs
--- ================================================================
-
-CREATE TABLE IF NOT EXISTS time_logs (
-    id bigserial PRIMARY KEY,
-    is_active boolean NOT NULL DEFAULT true,
-    is_deleted boolean NOT NULL DEFAULT false,
-    created_at timestamp NOT NULL DEFAULT now(),
-    created_by bigint,
-    updated_at timestamp,
-    updated_by bigint,
-    task_id bigint NOT NULL REFERENCES tasks(id),
-    user_id bigint NOT NULL REFERENCES users(id),
-    log_date date NOT NULL,
-    hours_spent decimal(4,1) NOT NULL,
-    description text,
-    CONSTRAINT uq_time_log UNIQUE (task_id, user_id, log_date)
-);
-
-CREATE INDEX IF NOT EXISTS idx_timelog_task ON time_logs(task_id);
-CREATE INDEX IF NOT EXISTS idx_timelog_user ON time_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_timelog_date ON time_logs(log_date);
 
 -- ================================================================
 -- Notifications (new schema)
