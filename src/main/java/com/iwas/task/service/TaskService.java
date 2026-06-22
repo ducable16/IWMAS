@@ -85,6 +85,19 @@ public class TaskService {
         return toResponseList(tasks);
     }
 
+    public List<TaskResponse> getUnassignedTasks(Long projectId) {
+        if (projectId != null) {
+            projectService.requireProjectAccess(projectId);
+            List<Task> tasks = taskRepository.findAll(TaskSpecification.unassignedByProject(projectId));
+            return toResponseList(tasks);
+        }
+
+        List<Long> managedIds = projectService.getManagedProjectIds();
+        if (managedIds.isEmpty()) return List.of();
+        List<Task> tasks = taskRepository.findAll(TaskSpecification.unassignedByProjects(managedIds));
+        return toResponseList(tasks);
+    }
+
     public List<TaskResponse> getMyTasks(Long userId) {
         List<Task> tasks = taskRepository.findByAssigneeId(userId);
         return toResponseList(tasks);

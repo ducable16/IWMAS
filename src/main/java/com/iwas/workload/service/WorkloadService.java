@@ -469,8 +469,8 @@ public class WorkloadService {
 
         ProjectMember pmRow = projectMemberRepository
                 .findActiveMemberByProjectIdAndUserId(projectId, userId).orElse(null);
-        boolean managerOnly = pmRow == null && userId.equals(project.getManagerId());
-        if (pmRow == null && !managerOnly) throw new AppException(ErrorCode.FORBIDDEN);
+        boolean isManager = pmRow == null && userId.equals(project.getManagerId());
+        if (pmRow == null && !isManager) throw new AppException(ErrorCode.FORBIDDEN);
 
         List<Task> laneTasks = taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, userId);
         List<Task> workable = laneTasks.stream().filter(WorkloadService::isWorkable).toList();
@@ -562,7 +562,10 @@ public class WorkloadService {
     public ProjectScheduleResponse suggestSchedule(Long userId, Long projectId) {
         LocalDate today = LocalDate.now();
         ScheduleContext ctx = loadScheduleContext(userId, projectId);
-        return buildProjectSchedule(ctx, atcOrder(ctx.workable(), ctx.dailyCap()), false, today);
+
+        List<ScheduledTask> ordered = atcOrder(ctx.workable(), ctx.dailyCap());
+
+        return buildProjectSchedule(ctx, ordered, false, today);
     }
 
     /** Simulates a member-proposed order without persisting it. */

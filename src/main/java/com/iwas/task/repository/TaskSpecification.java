@@ -86,6 +86,22 @@ public class TaskSpecification {
         );
     }
 
+    public static Specification<Task> unassignedByProject(Long projectId) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get("isDeleted"), false),
+                cb.equal(root.get("projectId"), projectId),
+                root.get("assigneeId").isNull()
+        );
+    }
+
+    public static Specification<Task> unassignedByProjects(List<Long> projectIds) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get("isDeleted"), false),
+                root.get("projectId").in(projectIds),
+                root.get("assigneeId").isNull()
+        );
+    }
+
     public static Specification<Task> forCalendar(LocalDate from, LocalDate to, Long projectId) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();

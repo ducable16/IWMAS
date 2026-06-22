@@ -111,6 +111,12 @@ public class TaskController {
         return taskService.getUnestimatedTasks(projectId);
     }
 
+    @GetMapping("/unassigned")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
+    public List<TaskResponse> getUnassigned(@RequestParam(required = false) Long projectId) {
+        return taskService.getUnassignedTasks(projectId);
+    }
+
     @GetMapping("/calendar")
     public List<CalendarDayResponse> getCalendarView(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

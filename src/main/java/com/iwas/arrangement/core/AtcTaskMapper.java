@@ -27,8 +27,8 @@ public final class AtcTaskMapper {
     }
 
     private static double processingHours(Task task) {
-        BigDecimal remaining = task.getEstimatedHours();
-        if (remaining == null || remaining.signum() <= 0) return 0.0;
-        return remaining.doubleValue();
+        BigDecimal est = task.getEstimatedHours();
+        if (est == null || est.signum() <= 0) return 0.0;
+        return est.doubleValue();
     }
 }
