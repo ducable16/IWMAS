@@ -50,9 +50,8 @@ public class SearchService {
 
         if (projectId != null) {
             List<SuggestionItem> suggestions = projectService
-                    .searchProjectMembers(projectId, query, List.of(), topN)
+                    .searchProjectMembers(projectId, query, List.of(), role, topN)
                     .stream()
-                    .filter(u -> role == null || role == u.getRole())
                     .map(u -> SuggestionItem.builder().term(u.getFullName()).entityId(u.getId()).build())
                     .toList();
             return AutocompleteResponse.builder()

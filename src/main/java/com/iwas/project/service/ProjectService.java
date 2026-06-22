@@ -293,11 +293,12 @@ public class ProjectService {
                     projectMemberRepository.save(pm);
                 });
 
-        // Reassign the outgoing manager's still-active tasks to the new manager.
+        // Unassign the outgoing manager's still-active tasks: a project manager cannot be a task
+        // assignee, so they must not be carried over to the incoming manager either.
         List<com.iwas.task.entity.Task> tasks =
                 taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, oldManagerId);
         if (!tasks.isEmpty()) {
-            tasks.forEach(t -> t.setAssigneeId(newManagerId));
+            tasks.forEach(t -> t.setAssigneeId(null));
             taskRepository.saveAll(tasks);
         }
 
@@ -510,12 +511,10 @@ public class ProjectService {
         member.setIsDeleted(true);
         projectMemberRepository.save(member);
 
-        Project project = findProject(projectId);
         List<com.iwas.task.entity.Task> tasks =
                 taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, member.getUserId());
         if (!tasks.isEmpty()) {
-            Long pmId = project.getManagerId();
-            tasks.forEach(t -> t.setAssigneeId(pmId));
+            tasks.forEach(t -> t.setAssigneeId(null));
             taskRepository.saveAll(tasks);
         }
     }
@@ -572,7 +571,7 @@ public class ProjectService {
     }
 
     public List<UserMeResponse> searchProjectMembers(Long projectId, String q,
-                                                     List<RequiredSkill> requiredSkills, int size) {
+                                                     List<RequiredSkill> requiredSkills, UserRole role, int size) {
         Project project = findProject(projectId);
         requireProjectAccess(projectId);
 
@@ -596,7 +595,10 @@ public class ProjectService {
         List<User> users = userRepository.searchByIdsAndKeyword(
                 new ArrayList<>(candidateIds), keyword, PageRequest.of(0, limit));
 
-        return users.stream().map(userMapper::toUserMeResponse).toList();
+        return users.stream()
+                .filter(u -> role == null || role == u.getRole())
+                .map(userMapper::toUserMeResponse)
+                .toList();
     }
 
     /**
@@ -659,6 +661,12 @@ public class ProjectService {
             return Stream.concat(memberIds.stream(), managedIds.stream()).distinct().toList();
         }
         return memberIds;
+    }
+
+    public List<Long> getManagedProjectIds() {
+        Long userId = authenticatedUserResolver.currentUserId();
+        return projectRepository.findByManagerId(userId)
+                .stream().map(Project::getId).toList();
     }
 
     // --- Effort remaining ---

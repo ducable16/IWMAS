@@ -73,6 +73,7 @@ public enum ErrorCode {
     TASK_INVALID_DATE_RANGE(5005, "Start date must not be after due date", HttpStatus.BAD_REQUEST),
     TASK_DATES_REQUIRED(5006, "At least one of start date or due date is required", HttpStatus.BAD_REQUEST),
     TASK_ASSIGNEE_SKILL_NOT_MET(5007, "Assignee does not meet the required skill level for this task", HttpStatus.BAD_REQUEST),
+    TASK_ASSIGNEE_CANNOT_BE_MANAGER(5008, "Project manager cannot be assigned tasks", HttpStatus.BAD_REQUEST),
 
     // --- 7xxx: Notifications ---
     NOTIFICATION_NOT_FOUND(7001, "Notification not found", HttpStatus.NOT_FOUND),

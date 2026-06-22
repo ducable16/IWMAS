@@ -163,9 +163,11 @@ public class WorkloadService {
 
         List<Task> workable = laneTasks.stream().filter(WorkloadService::isWorkable).toList();
         // Workload axis: backlog volume — deadline-agnostic, order-independent.
-        BigDecimal backlogHours = workable.stream()
-                .map(WorkloadService::resolveRemaining)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal backlogHours = BigDecimal.ZERO;
+
+        for (Task task : workable) {
+            backlogHours = backlogHours.add(task.getEstimatedHours());
+        }
 
         int overdueCount = (int) laneTasks.stream().filter(t -> isOverdue(t, today)).count();
         int unestimatedCount = (int) laneTasks.stream().filter(WorkloadService::isUnestimated).count();
@@ -268,7 +270,8 @@ public class WorkloadService {
                               int predictedLateTaskCount,
                               int unestimatedTaskCount,
                               List<ProjectAllocationItem> projectItems,
-                              List<TaskWorkloadItem> taskItems) {}
+                              List<TaskWorkloadItem> taskItems,
+                              List<TaskWorkloadItem> unestimatedTasks) {}
 
     /** Severity for picking the member's worst lane (lower = worse). */
     private static int loadRank(LoadLevel l) {
@@ -332,12 +335,16 @@ public class WorkloadService {
             worstDays = maxNullable(worstDays, lane.backlogDays());
         }
 
+        List<TaskWorkloadItem> unestimatedTasks = taskItems.stream()
+                .filter(TaskWorkloadItem::isUnestimated)
+                .toList();
+
         return new MemberLoad(
                 worstLevel != null ? worstLevel : LoadLevel.UNDEFINED,
                 worstDays,
                 overdueTotal + lateTotal,
                 activeTasks.size(), overdueTotal, lateTotal, unestimatedTotal,
-                projectItems, taskItems);
+                projectItems, taskItems, unestimatedTasks);
     }
 
     private static BigDecimal maxNullable(BigDecimal a, BigDecimal b) {
@@ -686,6 +693,7 @@ public class WorkloadService {
                 .overdueTaskCount(ml.overdueTaskCount())
                 .predictedLateTaskCount(ml.predictedLateTaskCount())
                 .unestimatedTaskCount(ml.unestimatedTaskCount())
+                .unestimatedTasks(ml.unestimatedTasks())
                 .activeTaskCount(ml.activeTaskCount())
                 .projectAllocations(projectItems)
                 .tasks(taskItems)

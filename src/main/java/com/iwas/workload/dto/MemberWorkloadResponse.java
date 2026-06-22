@@ -46,6 +46,11 @@ public class MemberWorkloadResponse {
     private Integer activeTaskCount;
     /** Active tasks with no usable estimate and no reported remaining — load is undercounted. */
     private Integer unestimatedTaskCount;
+    /**
+     * The unestimated tasks themselves (a data-quality nudge: "estimate these so the load is
+     * trustworthy"). Always populated — including on list views where {@link #tasks} is null.
+     */
+    private List<TaskWorkloadItem> unestimatedTasks;
 
     /** Per-project lane breakdown — null for endpoints that don't compute it. */
     private List<ProjectAllocationItem> projectAllocations;

@@ -105,6 +105,12 @@ public class TaskController {
         taskService.deleteTask(id);
     }
 
+    @GetMapping("/unestimated")
+    @PreAuthorize("hasRole('PROJECT_MANAGER')")
+    public List<TaskResponse> getUnestimated(@RequestParam(required = false) Long projectId) {
+        return taskService.getUnestimatedTasks(projectId);
+    }
+
     @GetMapping("/calendar")
     public List<CalendarDayResponse> getCalendarView(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

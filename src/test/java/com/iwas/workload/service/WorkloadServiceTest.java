@@ -154,6 +154,22 @@ class WorkloadServiceTest {
     }
 
     @Test
+    void unestimatedTaskIsCountedAndListed() {
+        // Task with no estimate & no reported remaining → contributes 0 to load,
+        // but is surfaced via unestimatedTaskCount + unestimatedTasks.
+        LocalDate today = LocalDate.now();
+        Task noEstimate = task(7, today, ScheduleSimulator.addWorkdays(today, 5), null);
+        stubMemberLookups(List.of(noEstimate), membership(100));
+
+        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
+
+        assertEquals(1, res.getUnestimatedTaskCount());
+        assertEquals(1, res.getUnestimatedTasks().size());
+        assertEquals(7L, res.getUnestimatedTasks().get(0).getTaskId());
+        assertTrue(res.getUnestimatedTasks().get(0).isUnestimated());
+    }
+
+    @Test
     void candidateTaskImpactIsUndefinedWithoutAllocationRow() {
         when(projectRepo.findById(PROJECT_ID)).thenReturn(Optional.of(project()));
         when(userRepo.existsById(USER_ID)).thenReturn(true);

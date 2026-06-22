@@ -5,6 +5,7 @@ import com.iwas.project.service.ProjectService;
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.skill.dto.RequiredSkill;
 import com.iwas.user.dto.UserMeResponse;
+import com.iwas.user.enums.UserRole;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -89,8 +90,9 @@ public class ProjectController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "") String q,
             @RequestParam(value = "requiredSkills", required = false) String requiredSkills,
+            @RequestParam(value = "role", required = false) UserRole role,
             @RequestParam(defaultValue = "10") int size) {
-        return projectService.searchProjectMembers(id, q, RequiredSkill.parse(requiredSkills), size);
+        return projectService.searchProjectMembers(id, q, RequiredSkill.parse(requiredSkills), role, size);
     }
 
     @PostMapping("/{id}/members")

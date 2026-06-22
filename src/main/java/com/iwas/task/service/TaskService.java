@@ -72,6 +72,19 @@ public class TaskService {
         return toResponseList(tasks);
     }
 
+    public List<TaskResponse> getUnestimatedTasks(Long projectId) {
+        if (projectId != null) {
+            projectService.requireProjectAccess(projectId);
+            List<Task> tasks = taskRepository.findAll(TaskSpecification.unestimatedByProject(projectId));
+            return toResponseList(tasks);
+        }
+
+        List<Long> managedIds = projectService.getManagedProjectIds();
+        if (managedIds.isEmpty()) return List.of();
+        List<Task> tasks = taskRepository.findAll(TaskSpecification.unestimatedByProjects(managedIds));
+        return toResponseList(tasks);
+    }
+
     public List<TaskResponse> getMyTasks(Long userId) {
         List<Task> tasks = taskRepository.findByAssigneeId(userId);
         return toResponseList(tasks);
@@ -124,23 +137,27 @@ public class TaskService {
     }
 
     public TaskPageResponse searchTasks(TaskFilterRequest filter) {
-        if (filter.getProjectId() != null) {
-            projectService.requireProjectAccess(filter.getProjectId());
-        }
-
         int size = Math.min(filter.getSize(), 100);
         Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
         PageRequest pageRequest = PageRequest.of(filter.getPage(), size, sort);
 
         Specification<Task> spec = TaskSpecification.fromFilter(filter);
-        if (filter.getProjectId() == null) {
-            Specification<Task> filtered = applyAccessFilter(spec);
-            if (filtered == null) {
-                return TaskPageResponse.builder()
-                        .content(List.of()).page(filter.getPage()).size(size)
-                        .totalElements(0).totalPages(0).build();
+
+        if (filter.getProjectId() != null) {
+            // Search trong một project cụ thể — kiểm tra quyền truy cập
+            projectService.requireProjectAccess(filter.getProjectId());
+        } else {
+            // Search toàn bộ — chỉ trả task thuộc project user có quyền xem
+            // null = ADMIN, không cần lọc theo project
+            List<Long> accessibleIds = projectService.getAccessibleProjectIds();
+            if (accessibleIds != null) {
+                if (accessibleIds.isEmpty()) {
+                    return TaskPageResponse.builder()
+                            .content(List.of()).page(filter.getPage()).size(size)
+                            .totalElements(0).totalPages(0).build();
+                }
+                spec = spec.and((root, query, cb) -> root.get("projectId").in(accessibleIds));
             }
-            spec = filtered;
         }
 
         Page<Task> page = taskRepository.findAll(spec, pageRequest);
@@ -154,12 +171,10 @@ public class TaskService {
                 .build();
     }
 
+
     public KanbanBoardResponse getKanbanBoard(Long projectId) {
         projectService.requireProjectAccess(projectId);
-        return getKanbanBoardCached(projectId);
-    }
 
-    public KanbanBoardResponse getKanbanBoardCached(Long projectId) {
         List<Task> tasks = taskRepository.findAll(TaskSpecification.byProjectId(projectId));
         Map<TaskStatus, List<Task>> grouped = tasks.stream()
                 .collect(Collectors.groupingBy(Task::getStatus));
@@ -399,6 +414,9 @@ public class TaskService {
         if (assigneeId == null) return;
         if (!projectService.isProjectParticipant(projectId, assigneeId)) {
             throw new AppException(ErrorCode.TASK_ASSIGNEE_NOT_PROJECT_MEMBER);
+        }
+        if (projectService.isManagerOf(projectId, assigneeId)) {
+            throw new AppException(ErrorCode.TASK_ASSIGNEE_CANNOT_BE_MANAGER);
         }
     }
 

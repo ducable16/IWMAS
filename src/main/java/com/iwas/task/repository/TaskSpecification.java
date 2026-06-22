@@ -70,6 +70,22 @@ public class TaskSpecification {
         );
     }
 
+    public static Specification<Task> unestimatedByProject(Long projectId) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get("isDeleted"), false),
+                cb.equal(root.get("projectId"), projectId),
+                root.get("estimatedHours").isNull()
+        );
+    }
+
+    public static Specification<Task> unestimatedByProjects(List<Long> projectIds) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get("isDeleted"), false),
+                root.get("projectId").in(projectIds),
+                root.get("estimatedHours").isNull()
+        );
+    }
+
     public static Specification<Task> forCalendar(LocalDate from, LocalDate to, Long projectId) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
