@@ -2,7 +2,6 @@ package com.iwas.workload.dto;
 
 import com.iwas.task.enums.TaskPriority;
 import com.iwas.task.enums.TaskStatus;
-import com.iwas.workload.enums.LoadLevel;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -30,9 +29,6 @@ public class MemberWorkloadResponse {
     private String userFullName;
     private String email;
 
-    // ── Workload axis (volume) ──────────────────────────────────────────────
-    /** Aggregate load badge — the worst lane (most workdays of queued work). */
-    private LoadLevel loadLevel;
     /** Backlog of the most-loaded lane, in workdays of work; null when no lane has capacity. */
     private BigDecimal worstBacklogDays;
 
@@ -96,7 +92,6 @@ public class MemberWorkloadResponse {
         private BigDecimal backlogHours;
         /** backlogHours ÷ dailyCapacityHours = workdays to clear; null when the lane has no capacity. */
         private BigDecimal backlogDays;
-        private LoadLevel loadLevel;
         /** Tasks already past their due date in this lane. */
         private Integer overdueCount;
         /** Tasks predicted to slip but not yet overdue in this lane. */

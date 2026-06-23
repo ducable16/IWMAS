@@ -21,7 +21,7 @@ import com.iwas.user.repository.UserRepository;
 import com.iwas.workload.dto.MemberWorkloadResponse;
 import com.iwas.workload.dto.MemberWorkloadResponse.ProjectAllocationItem;
 import com.iwas.workload.dto.MemberWorkloadResponse.TaskWorkloadItem;
-import com.iwas.workload.enums.LoadLevel;
+import com.iwas.workload.dto.ProjectMemberWorkloadResponse;
 import com.iwas.workload.service.ScheduleSimulator.LaneSimulation;
 import com.iwas.workload.service.ScheduleSimulator.ScheduledTask;
 import com.iwas.workload.service.ScheduleSimulator.TaskSchedule;
@@ -68,9 +68,6 @@ public class WorkloadService {
     private final TardinessArranger tardinessArranger;
 
     private static final double DEFAULT_DAILY_HOURS = 8.0;
-    // Dashboard "Workload" axis — backlog depth thresholds, in workdays of queued work.
-    private static final BigDecimal LOAD_BUSY_DAYS = BigDecimal.valueOf(5);        // ≤5 workdays → AVAILABLE
-    private static final BigDecimal LOAD_OVERLOADED_DAYS = BigDecimal.valueOf(10);  // ≤10 → BUSY, else OVERLOADED
 
     // ─── task helpers ─────────────────────────────────────────────────────────
 
@@ -110,7 +107,6 @@ public class WorkloadService {
     // ─── per-lane computation ─────────────────────────────────────────────────
 
     private record LaneLoad(ProjectAllocationItem item,
-                            LoadLevel loadLevel,
                             BigDecimal backlogDays,
                             int overdueCount,
                             int predictedLateCount,
@@ -175,13 +171,9 @@ public class WorkloadService {
         Map<Long, TaskSchedule> scheduleByTask = new HashMap<>();
         BigDecimal backlogDays = null;
         int predictedLate = 0;
-        LoadLevel loadLevel;
 
-        if (!hasCapacity) {
-            loadLevel = (allocation != null && allocation == 0) ? LoadLevel.BLOCKED : LoadLevel.UNDEFINED;
-        } else {
+        if (hasCapacity) {
             backlogDays = backlogHours.divide(dailyCapacity, 2, RoundingMode.HALF_UP);
-            loadLevel = loadLevelFor(backlogDays);
             // Risk axis: simulate to find slips. startDate no longer gates, so every workable
             // task is scheduled from today in ATC (or the member's saved) order.
             LaneSimulation sim = scheduleSimulator.simulate(orderLane(workable, dailyCapacity), dailyCapacity, today);
@@ -204,20 +196,12 @@ public class WorkloadService {
                 .dailyCapacityHours(dailyCapacity)
                 .backlogHours(backlogHours)
                 .backlogDays(backlogDays)
-                .loadLevel(loadLevel)
                 .overdueCount(overdueCount)
                 .predictedLateTaskCount(predictedLate)
                 .build();
 
-        return new LaneLoad(item, loadLevel, backlogDays,
+        return new LaneLoad(item, backlogDays,
                 overdueCount, predictedLate, unestimatedCount, taskItems);
-    }
-
-    /** Maps backlog depth (workdays of queued work) to a load badge. */
-    private static LoadLevel loadLevelFor(BigDecimal backlogDays) {
-        if (backlogDays.compareTo(LOAD_BUSY_DAYS) <= 0) return LoadLevel.AVAILABLE;
-        if (backlogDays.compareTo(LOAD_OVERLOADED_DAYS) <= 0) return LoadLevel.BUSY;
-        return LoadLevel.OVERLOADED;
     }
 
     private static LocalDate dueDateOf(Long taskId, List<Task> tasks) {
@@ -262,8 +246,7 @@ public class WorkloadService {
 
     // ─── per-member aggregation ───────────────────────────────────────────────
 
-    private record MemberLoad(LoadLevel loadLevel,
-                              BigDecimal worstBacklogDays,
+    private record MemberLoad(BigDecimal worstBacklogDays,
                               int atRiskCount,
                               int activeTaskCount,
                               int overdueTaskCount,
@@ -272,23 +255,6 @@ public class WorkloadService {
                               List<ProjectAllocationItem> projectItems,
                               List<TaskWorkloadItem> taskItems,
                               List<TaskWorkloadItem> unestimatedTasks) {}
-
-    /** Severity for picking the member's worst lane (lower = worse). */
-    private static int loadRank(LoadLevel l) {
-        return switch (l) {
-            case OVERLOADED -> 0;
-            case BUSY -> 1;
-            case AVAILABLE -> 2;
-            case BLOCKED -> 3;
-            case UNDEFINED -> 4;
-        };
-    }
-
-    private static LoadLevel worse(LoadLevel a, LoadLevel b) {
-        if (a == null) return b;
-        if (b == null) return a;
-        return loadRank(a) <= loadRank(b) ? a : b;
-    }
 
     private MemberLoad computeMemberLoad(User user, LocalDate today) {
         Long userId = user.getId();
@@ -316,7 +282,6 @@ public class WorkloadService {
 
         List<ProjectAllocationItem> projectItems = new ArrayList<>();
         List<TaskWorkloadItem> taskItems = new ArrayList<>();
-        LoadLevel worstLevel = null;
         BigDecimal worstDays = null;
         int overdueTotal = 0;
         int lateTotal = 0;
@@ -331,7 +296,6 @@ public class WorkloadService {
             overdueTotal += lane.overdueCount();
             lateTotal += lane.predictedLateCount();
             unestimatedTotal += lane.unestimatedCount();
-            worstLevel = worse(worstLevel, lane.loadLevel());
             worstDays = maxNullable(worstDays, lane.backlogDays());
         }
 
@@ -340,7 +304,6 @@ public class WorkloadService {
                 .toList();
 
         return new MemberLoad(
-                worstLevel != null ? worstLevel : LoadLevel.UNDEFINED,
                 worstDays,
                 overdueTotal + lateTotal,
                 activeTasks.size(), overdueTotal, lateTotal, unestimatedTotal,
@@ -355,34 +318,51 @@ public class WorkloadService {
 
     // ─── public read endpoints ────────────────────────────────────────────────
 
-    /** Real-time workload for all active participants of a project. */
-    public List<MemberWorkloadResponse> getProjectMembersWorkload(Long projectId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+    /**
+     * Real-time workload for all active participants of a project, scoped to that
+     * project's lane only. Caller must be the project manager.
+     */
+    public List<ProjectMemberWorkloadResponse> getProjectMembersWorkload(Long projectId, Long requestingUserId) {
+
+        Project project = projectRepository.findById(projectId).orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
+        if (!requestingUserId.equals(project.getManagerId()))
+            throw new AppException(ErrorCode.FORBIDDEN);
 
         LocalDate today = LocalDate.now();
 
+        List<ProjectMember> members = projectMemberRepository.findActiveMembersByProjectId(projectId);
+        Map<Long, ProjectMember> pmByUser = members.stream().collect(Collectors.toMap(ProjectMember::getUserId, m -> m));
+
         LinkedHashSet<Long> userIds = new LinkedHashSet<>();
         if (project.getManagerId() != null) userIds.add(project.getManagerId());
-        projectMemberRepository.findActiveMembersByProjectId(projectId)
-                .forEach(m -> userIds.add(m.getUserId()));
+        members.forEach(m -> userIds.add(m.getUserId()));
 
         Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        return userIds.stream()
-                .filter(uid -> userMap.containsKey(uid)
-                        && !Boolean.TRUE.equals(userMap.get(uid).getIsDeleted()))
-                .map(uid -> {
-                    User user = userMap.get(uid);
-                    MemberLoad ml = computeMemberLoad(user, today);
-                    // Project view: keep the aggregate axes, show only this project's lane.
-                    List<ProjectAllocationItem> thisProject = ml.projectItems().stream()
-                            .filter(i -> projectId.equals(i.getProjectId()))
-                            .toList();
-                    return toMemberResponse(user, ml, thisProject, null);
-                })
-                .toList();
+        List<ProjectMemberWorkloadResponse> result = new ArrayList<>();
+        for (Long uid : userIds) {
+            User user = userMap.get(uid);
+            if (user == null || Boolean.TRUE.equals(user.getIsDeleted())) continue;
+
+            List<Task> laneTasks = taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, uid);
+            LaneLoad lane = computeLaneLoad(project, pmByUser.get(uid), laneTasks, today);
+
+            List<TaskWorkloadItem> unestimatedTasks = lane.taskItems().stream()
+                    .filter(TaskWorkloadItem::isUnestimated).toList();
+
+            result.add(ProjectMemberWorkloadResponse.builder()
+                    .userId(user.getId())
+                    .userFullName(user.getFullName())
+                    .email(user.getEmail())
+                    .projectAllocation(lane.item())
+                    .activeTaskCount(laneTasks.size())
+                    .unestimatedTaskCount(lane.unestimatedCount())
+                    .unestimatedTasks(unestimatedTasks)
+                    .tasks(lane.taskItems())
+                    .build());
+        }
+        return result;
     }
 
     /** Real-time load for a single user — aggregate + per-project lanes + task list. */
@@ -392,47 +372,6 @@ public class WorkloadService {
         LocalDate today = LocalDate.now();
         MemberLoad ml = computeMemberLoad(user, today);
         return toMemberResponse(user, ml, ml.projectItems(), ml.taskItems());
-    }
-
-    /**
-     * Real-time workload of every member across the projects the given manager manages
-     * ({@code managerId = managerId}), deduplicated — a member in several of the manager's
-     * projects appears exactly once. The manager themselves is excluded (this is their team).
-     *
-     * <p>Collapses the FE's per-member fan-out of {@code GET /workload/users/{id}/realtime}
-     * into a single request. Each element matches {@link #getUserWorkloadRealtime} — aggregate
-     * badge, per-project lanes, and the task breakdown — computed over each member's full set of
-     * projects (not only the manager's), so it reflects their true total load.
-     */
-    public List<MemberWorkloadResponse> getManagedMembersWorkload(Long managerId) {
-        List<Long> projectIds = projectRepository.findByManagerId(managerId)
-                .stream().map(Project::getId).toList();
-        if (projectIds.isEmpty()) return List.of();
-
-        LocalDate today = LocalDate.now();
-        List<User> members = getActiveTeamMembers(projectIds, managerId);
-
-        List<MemberWorkloadResponse> result = new ArrayList<>();
-        for (User user : members) {
-            MemberLoad ml = computeMemberLoad(user, today);
-            result.add(toMemberResponse(user, ml, ml.projectItems(), ml.taskItems()));
-        }
-        return result;
-    }
-
-    private List<User> getActiveTeamMembers(List<Long> projectIds, Long excludeUserId) {
-        LinkedHashSet<Long> userIds = new LinkedHashSet<>();
-        projectMemberRepository.findActiveMembersByProjectIdIn(projectIds)
-                .forEach(m -> userIds.add(m.getUserId()));
-        userIds.remove(excludeUserId);
-
-        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
-                .collect(Collectors.toMap(User::getId, u -> u));
-
-        return userIds.stream()
-                .map(userMap::get)
-                .filter(u -> u != null && !Boolean.TRUE.equals(u.getIsDeleted()))
-                .toList();
     }
 
     /**
@@ -502,16 +441,10 @@ public class WorkloadService {
 
         Map<Long, TaskSchedule> scheduleByTask = new HashMap<>();
         BigDecimal backlogDays = null;
-        LoadLevel loadLevel;
         int predictedLate = 0;
 
-        if (dailyCap == null) {
-            loadLevel = LoadLevel.UNDEFINED;
-        } else if (dailyCap.signum() <= 0) {
-            loadLevel = LoadLevel.BLOCKED;
-        } else {
+        if (dailyCap != null && dailyCap.signum() > 0) {
             backlogDays = backlogHours.divide(dailyCap, 2, RoundingMode.HALF_UP);
-            loadLevel = loadLevelFor(backlogDays);
             LaneSimulation sim = scheduleSimulator.simulate(ordered, dailyCap, today);
             for (TaskSchedule ts : sim.schedules()) scheduleByTask.put(ts.taskId(), ts);
             predictedLate = (int) sim.schedules().stream()
@@ -541,7 +474,6 @@ public class WorkloadService {
                 .dailyCapacityHours(dailyCap)
                 .backlogHours(backlogHours)
                 .backlogDays(backlogDays)
-                .loadLevel(loadLevel)
                 .overdueCount(overdueCount)
                 .predictedLateTaskCount(predictedLate)
                 .savedOrder(savedOrder)
@@ -624,9 +556,7 @@ public class WorkloadService {
                 .userId(userId).projectId(projectId);
 
         if (dailyCap == null || dailyCap.signum() <= 0) {
-            LoadLevel lvl = dailyCap == null ? LoadLevel.UNDEFINED : LoadLevel.BLOCKED;
-            return b.loadLevelBefore(lvl).loadLevelAfter(lvl)
-                    .candidateTaskWillSlip(true).introducesNewSlip(false)
+            return b.candidateTaskWillSlip(true).introducesNewSlip(false)
                     .predictedLateTaskCountAfter(0).build();
         }
 
@@ -660,8 +590,6 @@ public class WorkloadService {
                 .divide(dailyCap, 2, RoundingMode.HALF_UP);
 
         return b
-                .loadLevelBefore(loadLevelFor(backlogDaysBefore))
-                .loadLevelAfter(loadLevelFor(backlogDaysAfter))
                 .backlogDaysBefore(backlogDaysBefore)
                 .backlogDaysAfter(backlogDaysAfter)
                 .predictedLateTaskCountAfter(lateAfter)
@@ -690,7 +618,6 @@ public class WorkloadService {
                 .userId(user.getId())
                 .userFullName(user.getFullName())
                 .email(user.getEmail())
-                .loadLevel(ml.loadLevel())
                 .worstBacklogDays(ml.worstBacklogDays())
                 .atRiskCount(ml.atRiskCount())
                 .overdueTaskCount(ml.overdueTaskCount())

@@ -1,6 +1,5 @@
 package com.iwas.workload.dto;
 
-import com.iwas.workload.enums.LoadLevel;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -19,8 +18,6 @@ import java.math.BigDecimal;
 public class CandidateWorkloadImpact {
     private Long userId;
     private Long projectId;
-    private LoadLevel loadLevelBefore;
-    private LoadLevel loadLevelAfter;
     private BigDecimal backlogDaysBefore;
     private BigDecimal backlogDaysAfter;
     private Integer predictedLateTaskCountAfter;

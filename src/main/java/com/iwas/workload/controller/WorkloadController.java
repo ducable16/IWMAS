@@ -2,6 +2,7 @@ package com.iwas.workload.controller;
 
 import com.iwas.security.AuthenticatedUserResolver;
 import com.iwas.workload.dto.MemberWorkloadResponse;
+import com.iwas.workload.dto.ProjectMemberWorkloadResponse;
 import com.iwas.workload.dto.ProjectScheduleResponse;
 import com.iwas.workload.dto.SchedulePreviewRequest;
 import com.iwas.workload.service.WorkloadService;
@@ -22,20 +23,14 @@ public class WorkloadController {
 
     @GetMapping("/projects/{projectId}/members")
     @PreAuthorize("hasRole('PROJECT_MANAGER')")
-    public List<MemberWorkloadResponse> getProjectMembersWorkload(@PathVariable Long projectId) {
-        return workloadService.getProjectMembersWorkload(projectId);
+    public List<ProjectMemberWorkloadResponse> getProjectMembersWorkload(@PathVariable Long projectId) {
+        return workloadService.getProjectMembersWorkload(projectId, authenticatedUserResolver.currentUserId());
     }
 
     @GetMapping("/users/{userId}/realtime")
     @PreAuthorize("hasAnyRole('HR', 'PROJECT_MANAGER')")
     public MemberWorkloadResponse getUserWorkloadRealtime(@PathVariable Long userId) {
         return workloadService.getUserWorkloadRealtime(userId);
-    }
-
-    @GetMapping("/my-team/realtime")
-    @PreAuthorize("hasRole('PROJECT_MANAGER')")
-    public List<MemberWorkloadResponse> getMyTeamWorkloadRealtime() {
-        return workloadService.getManagedMembersWorkload(authenticatedUserResolver.currentUserId());
     }
 
     @GetMapping("/me/realtime")

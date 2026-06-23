@@ -1,7 +1,6 @@
 package com.iwas.workload.dto;
 
 import com.iwas.workload.dto.MemberWorkloadResponse.TaskWorkloadItem;
-import com.iwas.workload.enums.LoadLevel;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -30,7 +29,6 @@ public class ProjectScheduleResponse {
     private BigDecimal backlogHours;
     /** backlogHours ÷ dailyCapacityHours = workdays to clear; null when the lane has no capacity. */
     private BigDecimal backlogDays;
-    private LoadLevel loadLevel;
     /** Tasks already past their due date in this lane. */
     private Integer overdueCount;
     /** Tasks predicted to slip but not yet overdue under this order. */

@@ -23,18 +23,15 @@ import com.iwas.workload.service.ScheduleSimulator.LaneSimulation;
 import com.iwas.workload.service.ScheduleSimulator.ScheduledTask;
 import com.iwas.workload.service.ScheduleSimulator.TaskSchedule;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Orchestrates the ATC task-arrangement use cases for a single member lane:
@@ -72,8 +69,12 @@ public class TaskArrangementService {
                 .toList();
         List<ArrangedTask> arranged = arranger.arrange(atcTasks, config);
 
-        Map<Long, TaskSchedule> calendar = projectCalendar(lane, arranged, today);
-        Map<Long, Task> byId = byId(lane.workable());
+        Map<Long, Task> byId = lane.workable().stream()
+                .collect(Collectors.toMap(Task::getId, t -> t));
+        List<ScheduledTask> orderedForSim = arranged.stream()
+                .map(a -> toScheduledTask(byId.get(a.taskId())))
+                .toList();
+        Map<Long, TaskSchedule> calendar = projectCalendar(lane.dailyCap(), orderedForSim, today);
 
         List<ArrangeResponse.Item> items = new ArrayList<>();
         for (ArrangedTask a : arranged) {
@@ -115,11 +116,17 @@ public class TaskArrangementService {
         Optional<AtcTask> next = dispatcher.nextTask(eligible, config);
         if (next.isEmpty()) return NextTaskResponse.empty(projectId, assigneeId);
 
-        Task task = byId(lane.workable()).get(next.get().id());
-        double pAverage = TardinessArranger.meanProcessing(eligible, config);
+        long nextId = next.get().id();
+        Task nextTask = null;
+        for(Task t : lane.workable()) {
+            if (t.getId().equals(nextId)) {
+                nextTask = t;
+            }
+        }
+        if(nextTask == null) throw new NoSuchElementException("No value present");
         return new NextTaskResponse(projectId, assigneeId, false,
-                task.getId(), task.getTitle(), task.getPriority(),
-                reasonFor(task, today, orderingCap, config, pAverage));
+                nextTask.getId(), nextTask.getTitle(), nextTask.getPriority(),
+                reasonFor(nextTask, today, orderingCap, config));
     }
 
     // ─── lane loading ─────────────────────────────────────────────────────────
@@ -142,28 +149,17 @@ public class TaskArrangementService {
         return new Lane(alloc, dailyCapHours(alloc), workable);
     }
 
-    /** Runs the workload simulator over the ATC order to attach calendar dates. */
-    private Map<Long, TaskSchedule> projectCalendar(Lane lane, List<ArrangedTask> arranged,
+    /** Runs the workload simulator over the ATC-ordered tasks to attach calendar dates. */
+    private Map<Long, TaskSchedule> projectCalendar(double dailyCap,
+                                                    List<ScheduledTask> ordered,
                                                     LocalDate today) {
-        if (lane.dailyCap() <= 0 || arranged.isEmpty()) return Map.of();
-        Map<Long, Task> byId = byId(lane.workable());
-        List<ScheduledTask> ordered = arranged.stream()
-                .map(a -> toScheduledTask(byId.get(a.taskId())))
-                .toList();
-        LaneSimulation sim = scheduleSimulator.simulate(ordered,
-                capacityBd(lane.dailyCap()), today);
-        Map<Long, TaskSchedule> result = new HashMap<>();
-        for (TaskSchedule ts : sim.schedules()) result.put(ts.taskId(), ts);
-        return result;
+        if (dailyCap <= 0 || ordered.isEmpty()) return Map.of();
+        LaneSimulation sim = scheduleSimulator.simulate(ordered, capacityBd(dailyCap), today);
+        return sim.schedules().stream()
+                .collect(Collectors.toMap(TaskSchedule::taskId, ts -> ts));
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────
-
-    private static Map<Long, Task> byId(List<Task> tasks) {
-        Map<Long, Task> map = new HashMap<>();
-        for (Task t : tasks) map.put(t.getId(), t);
-        return map;
-    }
 
     private static ScheduledTask toScheduledTask(Task t) {
         return new ScheduledTask(t.getId(), t.getProjectId(), t.getEstimatedHours(),
@@ -187,7 +183,7 @@ public class TaskArrangementService {
     }
 
     private static String reasonFor(Task task, LocalDate today, double cap,
-                                    AtcConfig config, double pAverage) {
+                                    AtcConfig config) {
         AtcTask atc = AtcTaskMapper.from(task, today, cap);
         double slack = AtcIndex.slack(atc, 0.0, config);
         double valueDensity = config.weightOf(task.getPriority()) / AtcIndex.processing(atc, config);
