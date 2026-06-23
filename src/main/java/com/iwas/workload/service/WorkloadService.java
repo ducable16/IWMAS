@@ -256,7 +256,7 @@ public class WorkloadService {
                               List<TaskWorkloadItem> taskItems,
                               List<TaskWorkloadItem> unestimatedTasks) {}
 
-    private MemberLoad computeMemberLoad(User user, LocalDate today) {
+    private MemberLoad computeMemberLoad(User user, LocalDate today, Long restrictToManagerId) {
         Long userId = user.getId();
         List<Task> activeTasks = taskRepository.findActiveTasksByAssigneeId(userId);
         Map<Long, List<Task>> tasksByProject = activeTasks.stream()
@@ -264,20 +264,25 @@ public class WorkloadService {
 
         List<ProjectMember> memberships = projectMemberRepository.findActiveProjectsByUserId(userId);
 
-        // map nhung membership
         Map<Long, ProjectMember> pmByProject = new HashMap<>();
-
-        // list project id
         List<Long> projectIds = new ArrayList<>();
         for (ProjectMember m : memberships) {
             pmByProject.put(m.getProjectId(), m);
             projectIds.add(m.getProjectId());
         }
 
-        // map nhung project tham gia
         Map<Long, Project> projectMap = new HashMap<>();
         for (Project p : projectRepository.findAllById(projectIds)) {
             projectMap.put(p.getId(), p);
+        }
+
+        if (restrictToManagerId != null) {
+            projectIds = projectIds.stream()
+                    .filter(pid -> {
+                        Project p = projectMap.get(pid);
+                        return p != null && restrictToManagerId.equals(p.getManagerId());
+                    })
+                    .collect(Collectors.toList());
         }
 
         List<ProjectAllocationItem> projectItems = new ArrayList<>();
@@ -303,10 +308,14 @@ public class WorkloadService {
                 .filter(TaskWorkloadItem::isUnestimated)
                 .toList();
 
+        int activeTaskCount = projectIds.stream()
+                .mapToInt(pid -> tasksByProject.getOrDefault(pid, List.of()).size())
+                .sum();
+
         return new MemberLoad(
                 worstDays,
                 overdueTotal + lateTotal,
-                activeTasks.size(), overdueTotal, lateTotal, unestimatedTotal,
+                activeTaskCount, overdueTotal, lateTotal, unestimatedTotal,
                 projectItems, taskItems, unestimatedTasks);
     }
 
@@ -365,12 +374,16 @@ public class WorkloadService {
         return result;
     }
 
-    /** Real-time load for a single user — aggregate + per-project lanes + task list. */
-    public MemberWorkloadResponse getUserWorkloadRealtime(Long userId) {
+    /**
+     * Real-time load for a single user — aggregate + per-project lanes + task list.
+     * When {@code restrictToManagerId} is non-null, only lanes whose project is managed
+     * by that user are included (used by the PM-facing endpoint).
+     */
+    public MemberWorkloadResponse getUserWorkloadRealtime(Long userId, Long restrictToManagerId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         LocalDate today = LocalDate.now();
-        MemberLoad ml = computeMemberLoad(user, today);
+        MemberLoad ml = computeMemberLoad(user, today, restrictToManagerId);
         return toMemberResponse(user, ml, ml.projectItems(), ml.taskItems());
     }
 
@@ -384,7 +397,7 @@ public class WorkloadService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        MemberLoad ml = computeMemberLoad(user, LocalDate.now());
+        MemberLoad ml = computeMemberLoad(user, LocalDate.now(), null);
 
         if (ml.atRiskCount() > 0) {
             notificationService.send(

@@ -28,14 +28,14 @@ public class WorkloadController {
     }
 
     @GetMapping("/users/{userId}/realtime")
-    @PreAuthorize("hasAnyRole('HR', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasAnyRole('PROJECT_MANAGER')")
     public MemberWorkloadResponse getUserWorkloadRealtime(@PathVariable Long userId) {
-        return workloadService.getUserWorkloadRealtime(userId);
+        return workloadService.getUserWorkloadRealtime(userId, authenticatedUserResolver.currentUserId());
     }
 
     @GetMapping("/me/realtime")
     public MemberWorkloadResponse getMyWorkloadRealtime() {
-        return workloadService.getUserWorkloadRealtime(authenticatedUserResolver.currentUserId());
+        return workloadService.getUserWorkloadRealtime(authenticatedUserResolver.currentUserId(), null);
     }
 
     // ─── what-if scheduling for the current member ────────────────────────────

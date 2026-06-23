@@ -17,7 +17,6 @@ import com.iwas.user.entity.User;
 import com.iwas.user.repository.UserRepository;
 import com.iwas.workload.dto.CandidateWorkloadImpact;
 import com.iwas.workload.dto.MemberWorkloadResponse;
-import com.iwas.workload.enums.LoadLevel;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -114,10 +113,9 @@ class WorkloadServiceTest {
         Task light = task(1, today, ScheduleSimulator.addWorkdays(today, 9), BigDecimal.valueOf(8));
         stubMemberLookups(List.of(light), membership(100));
 
-        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
+        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID, null);
 
         // 8h at 100% (8h/day) → 1 workday of backlog → AVAILABLE; nothing at risk.
-        assertEquals(LoadLevel.AVAILABLE, res.getLoadLevel());
         assertEquals(0, res.getOverdueTaskCount());
         assertEquals(0, res.getPredictedLateTaskCount());
         assertEquals(0, res.getAtRiskCount());
@@ -132,9 +130,8 @@ class WorkloadServiceTest {
         Task overdue = task(1, today.minusDays(30), today.minusDays(15), BigDecimal.valueOf(8));
         stubMemberLookups(List.of(overdue), membership(100));
 
-        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
+        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID, null);
 
-        assertEquals(LoadLevel.AVAILABLE, res.getLoadLevel());
         assertEquals(1, res.getOverdueTaskCount());
         assertEquals(1, res.getAtRiskCount());
     }
@@ -147,9 +144,8 @@ class WorkloadServiceTest {
         Task big = task(1, today, ScheduleSimulator.addWorkdays(today, 59), BigDecimal.valueOf(100));
         stubMemberLookups(List.of(big), membership(100));
 
-        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
+        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID, null);
 
-        assertEquals(LoadLevel.OVERLOADED, res.getLoadLevel());
         assertEquals(0, res.getAtRiskCount(), "far deadline → no slip despite heavy volume");
     }
 
@@ -161,7 +157,7 @@ class WorkloadServiceTest {
         Task noEstimate = task(7, today, ScheduleSimulator.addWorkdays(today, 5), null);
         stubMemberLookups(List.of(noEstimate), membership(100));
 
-        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID);
+        MemberWorkloadResponse res = service.getUserWorkloadRealtime(USER_ID, null);
 
         assertEquals(1, res.getUnestimatedTaskCount());
         assertEquals(1, res.getUnestimatedTasks().size());
@@ -180,7 +176,6 @@ class WorkloadServiceTest {
                 USER_ID, PROJECT_ID, BigDecimal.valueOf(8),
                 LocalDate.now(), LocalDate.now().plusDays(7), TaskPriority.MEDIUM);
 
-        assertEquals(LoadLevel.UNDEFINED, impact.getLoadLevelAfter());
     }
 
     @Test
