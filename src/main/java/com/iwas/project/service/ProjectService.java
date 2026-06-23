@@ -854,7 +854,6 @@ public class ProjectService {
                 .status(p.getStatus())
                 .startDate(p.getStartDate())
                 .endDate(p.getEndDate())
-                .actualEndDate(p.getActualEndDate())
                 .managerId(p.getManagerId())
                 .createdAt(p.getCreatedAt())
                 .build();

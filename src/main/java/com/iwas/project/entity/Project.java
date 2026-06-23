@@ -39,9 +39,6 @@ public class Project extends BaseEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    @Column(name = "actual_end_date")
-    private LocalDate actualEndDate;
-
     @Column(name = "manager_id", nullable = false)
     private Long managerId;
 }

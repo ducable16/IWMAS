@@ -17,7 +17,6 @@ public class ProjectResponse {
     private ProjectStatus status;
     private LocalDate startDate;
     private LocalDate endDate;
-    private LocalDate actualEndDate;
     private Long managerId;
     private LocalDateTime createdAt;
 }
