@@ -63,7 +63,7 @@ app:
     search-user-sync-queue: search.user.sync
     search-user-sync-exchange: search.sync.user.exchange
     search-project-sync-queue: search.project.sync
-    search-project-sync-exchange: search.project.sync.exchange
+    search-project-sync-exchange: search.project.exchange
   search:
     bootstrap-on-startup: true
     autocomplete:
