@@ -185,8 +185,8 @@ public class TaskArrangementService {
     private static String reasonFor(Task task, LocalDate today, double cap,
                                     AtcConfig config) {
         AtcTask atc = AtcTaskMapper.from(task, today, cap);
-        double slack = AtcIndex.slack(atc, 0.0, config);
-        double valueDensity = config.weightOf(task.getPriority()) / AtcIndex.processing(atc, config);
+        double slack = AtcIndex.slack(atc, 0.0);
+        double valueDensity = config.weightOf(task.getPriority()) / atc.processingHours();
         String urgency = slack <= 0
                 ? String.format(Locale.US, "maximum urgency (slack=%.1fh)", slack)
                 : String.format(Locale.US, "%.1fh slack remaining", slack);

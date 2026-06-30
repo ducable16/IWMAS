@@ -12,14 +12,11 @@ public class AtcConfig {
 
     private final Map<TaskPriority, Double> weights;
     private final double k;
-    private final double minEstimateHours;
     private final TaskPriority priorityFallback;
 
-    public AtcConfig(Map<TaskPriority, Double> weights, double k,
-                     double minEstimateHours, TaskPriority priorityFallback) {
+    public AtcConfig(Map<TaskPriority, Double> weights, double k, TaskPriority priorityFallback) {
         this.weights = weights;
         this.k = k;
-        this.minEstimateHours = minEstimateHours;
         this.priorityFallback = priorityFallback;
     }
 
@@ -32,8 +29,7 @@ public class AtcConfig {
     }
 
     public static void initialize(AtcProperties props) {
-        defaultConfig = new AtcConfig(new EnumMap<>(props.getWeights()), props.getK(),
-                props.getMinEstimateHours(), props.getPriorityFallback());
+        defaultConfig = new AtcConfig(new EnumMap<>(props.getWeights()), props.getK(), props.getPriorityFallback());
     }
 
     public Map<TaskPriority, Double> weights() {
@@ -42,10 +38,6 @@ public class AtcConfig {
 
     public double k() {
         return k;
-    }
-
-    public double minEstimateHours() {
-        return minEstimateHours;
     }
 
     public TaskPriority priorityFallback() {
@@ -60,8 +52,7 @@ public class AtcConfig {
     public AtcConfig withOverrides(Double kOverride, Map<TaskPriority, Double> weightOverrides) {
         Map<TaskPriority, Double> merged = new EnumMap<>(weights);
         if (weightOverrides != null) merged.putAll(weightOverrides);
-        return new AtcConfig(merged, kOverride != null ? kOverride : k,
-                minEstimateHours, priorityFallback);
+        return new AtcConfig(merged, kOverride != null ? kOverride : k, priorityFallback);
     }
 
     /** Weight {@code wⱼ} for a priority, falling back to {@link #priorityFallback}. */

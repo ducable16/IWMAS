@@ -27,13 +27,13 @@ public final class AtcIndex {
 
     /** Effective processing time used in the index — floored so {@code w/p} is finite. */
     public static double processing(AtcTask task, AtcConfig config) {
-        return Math.max(task.processingHours(), config.minEstimateHours());
+        return task.processingHours();
     }
 
     /** {@code slackⱼ = dⱼ - pⱼ - t}; +∞ for tasks with no deadline. */
-    public static double slack(AtcTask task, double t, AtcConfig config) {
+    public static double slack(AtcTask task, double t) {
         double d = task.dueHours() != null ? task.dueHours() : Double.POSITIVE_INFINITY;
-        return d - processing(task, config) - t;
+        return d - task.processingHours() - t;
     }
 
     /** Urgency factor {@code exp(-max(0, slack)/(k·p̄))} ∈ (0, 1]. */
@@ -49,8 +49,8 @@ public final class AtcIndex {
      */
     public static double compute(AtcTask task, double t, double pAverage, AtcConfig config) {
         double w = config.weightOf(task.priority());
-        double p = processing(task, config);
-        double urgency = urgency(slack(task, t, config), pAverage, config);
+        double p = task.processingHours();
+        double urgency = urgency(slack(task, t), pAverage, config);
         return (w / p) * urgency;
     }
 }

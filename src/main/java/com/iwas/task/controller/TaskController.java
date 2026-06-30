@@ -63,6 +63,11 @@ public class TaskController {
         return taskService.getKanbanBoard(projectId);
     }
 
+    @GetMapping("/projects/{projectId}")
+    public List<TaskResponse> getByProject(@PathVariable Long projectId) {
+        return taskService.getTasksByProject(projectId);
+    }
+
     @GetMapping("/my")
     public List<TaskResponse> getMyTasks() {
         return taskService.getMyTasks(authenticatedUserResolver.currentUserId());

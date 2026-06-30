@@ -76,7 +76,6 @@ app:
       max-page-size: 50
   arrangement:
     k: 2.0
-    min-estimate-hours: 1
     priority-fallback: LOW
     weights:
       CRITICAL: 8

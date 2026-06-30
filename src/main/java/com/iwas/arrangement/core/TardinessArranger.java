@@ -36,7 +36,7 @@ public class TardinessArranger {
         int position = 0;
 
         while (!remaining.isEmpty()) {
-            double pAverage = meanProcessing(remaining, config);
+            double pAverage = meanProcessing(remaining);
             AtcTask best = null;
             double bestIndex = Double.NEGATIVE_INFINITY;
             for (AtcTask candidate : remaining) {
@@ -50,8 +50,8 @@ public class TardinessArranger {
                 }
             }
 
-            double p = AtcIndex.processing(best, config);
-            double slack = AtcIndex.slack(best, t, config);
+            double p = best.processingHours();
+            double slack = AtcIndex.slack(best, t);
             double start = t;
             t += p;
             double finish = t;
@@ -72,15 +72,15 @@ public class TardinessArranger {
     }
 
     /** Mean effective processing time; guarded to ≥ 1 so the slack scale is finite. */
-    public static double meanProcessing(List<AtcTask> tasks, AtcConfig config) {
+    public static double meanProcessing(List<AtcTask> tasks) {
         double sum = 0.0;
-        for (AtcTask t : tasks) sum += AtcIndex.processing(t, config);
+        for (AtcTask t : tasks) sum += t.processingHours();
         double mean = sum / tasks.size();
         return mean <= 0.0 ? 1.0 : mean;
     }
 
     private static String buildReason(AtcTask task, AtcConfig config, double slack, double pAverage) {
-        double valueDensity = config.weightOf(task.priority()) / AtcIndex.processing(task, config);
+        double valueDensity = config.weightOf(task.priority()) / task.processingHours();
         String urgencyNote;
         if (task.dueHours() == null) {
             urgencyNote = "no deadline (sinks to the end of its tier)";

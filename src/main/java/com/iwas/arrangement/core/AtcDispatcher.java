@@ -24,7 +24,7 @@ public class AtcDispatcher {
     public Optional<AtcTask> nextTask(List<AtcTask> eligible, double t, AtcConfig config) {
         if (eligible == null || eligible.isEmpty()) return Optional.empty();
 
-        double pAverage = TardinessArranger.meanProcessing(eligible, config);
+        double pAverage = TardinessArranger.meanProcessing(eligible);
         AtcTask best = null;
         double bestIndex = Double.NEGATIVE_INFINITY;
         for (AtcTask candidate : eligible) {
