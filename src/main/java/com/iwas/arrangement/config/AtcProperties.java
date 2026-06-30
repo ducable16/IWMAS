@@ -17,8 +17,6 @@ public class AtcProperties {
 
     private double k = 2.0;
 
-    private TaskPriority priorityFallback = TaskPriority.LOW;
-
     private Map<TaskPriority, Double> weights = defaultWeights();
 
     @PostConstruct

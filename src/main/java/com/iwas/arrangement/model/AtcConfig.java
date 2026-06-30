@@ -12,12 +12,10 @@ public class AtcConfig {
 
     private final Map<TaskPriority, Double> weights;
     private final double k;
-    private final TaskPriority priorityFallback;
 
-    public AtcConfig(Map<TaskPriority, Double> weights, double k, TaskPriority priorityFallback) {
+    public AtcConfig(Map<TaskPriority, Double> weights, double k) {
         this.weights = weights;
         this.k = k;
-        this.priorityFallback = priorityFallback;
     }
 
     public static AtcConfig getDefault() {
@@ -29,7 +27,7 @@ public class AtcConfig {
     }
 
     public static void initialize(AtcProperties props) {
-        defaultConfig = new AtcConfig(new EnumMap<>(props.getWeights()), props.getK(), props.getPriorityFallback());
+        defaultConfig = new AtcConfig(new EnumMap<>(props.getWeights()), props.getK());
     }
 
     public Map<TaskPriority, Double> weights() {
@@ -40,20 +38,13 @@ public class AtcConfig {
         return k;
     }
 
-    public TaskPriority priorityFallback() {
-        return priorityFallback;
-    }
-
     public AtcConfig withOverrides(Double kOverride, Map<TaskPriority, Double> weightOverrides) {
         Map<TaskPriority, Double> merged = new EnumMap<>(weights);
         if (weightOverrides != null) merged.putAll(weightOverrides);
-        return new AtcConfig(merged, kOverride != null ? kOverride : k, priorityFallback);
+        return new AtcConfig(merged, kOverride != null ? kOverride : k);
     }
 
     public double weightOf(TaskPriority priority) {
-        Double w = priority != null ? weights.get(priority) : null;
-        if (w != null) return w;
-        Double fallback = weights.get(priorityFallback);
-        return fallback != null ? fallback : 1.0;
+        return weights.get(priority);
     }
 }

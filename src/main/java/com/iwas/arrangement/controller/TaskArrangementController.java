@@ -27,43 +27,23 @@ public class TaskArrangementController {
 
     @GetMapping("/lanes/{projectId}/{assigneeId}")
     @PreAuthorize("hasRole('PROJECT_MANAGER')")
-    public ArrangeResponse arrange(@PathVariable Long projectId, @PathVariable Long assigneeId,
-                                   @RequestParam(required = false) Double k,
-                                   @RequestParam(required = false) Double wCritical,
-                                   @RequestParam(required = false) Double wHigh,
-                                   @RequestParam(required = false) Double wMedium,
-                                   @RequestParam(required = false) Double wLow) {
-        return arrangementService.arrangeLane(projectId, assigneeId, k,
-                weightOverrides(wCritical, wHigh, wMedium, wLow));
+    public ArrangeResponse arrange(@PathVariable Long projectId, @PathVariable Long assigneeId) {
+        return arrangementService.arrangeLane(projectId, assigneeId);
     }
 
     @GetMapping("/lanes/{projectId}/{assigneeId}/next")
     @PreAuthorize("hasRole('PROJECT_MANAGER')")
-    public NextTaskResponse next(@PathVariable Long projectId, @PathVariable Long assigneeId,
-                                 @RequestParam(required = false) Double k) {
-        return arrangementService.nextTask(projectId, assigneeId, k, null);
+    public NextTaskResponse next(@PathVariable Long projectId, @PathVariable Long assigneeId) {
+        return arrangementService.nextTask(projectId, assigneeId);
     }
 
     @GetMapping("/me/lanes/{projectId}")
-    public ArrangeResponse arrangeMine(@PathVariable Long projectId,
-                                       @RequestParam(required = false) Double k) {
-        return arrangementService.arrangeLane(projectId,
-                authenticatedUserResolver.currentUserId(), k, null);
+    public ArrangeResponse arrangeMine(@PathVariable Long projectId) {
+        return arrangementService.arrangeLane(projectId, authenticatedUserResolver.currentUserId());
     }
 
     @GetMapping("/me/lanes/{projectId}/next")
     public NextTaskResponse nextMine(@PathVariable Long projectId) {
-        return arrangementService.nextTask(projectId,
-                authenticatedUserResolver.currentUserId(), null, null);
-    }
-
-    private static Map<TaskPriority, Double> weightOverrides(Double critical, Double high,
-                                                             Double medium, Double low) {
-        Map<TaskPriority, Double> overrides = new EnumMap<>(TaskPriority.class);
-        if (critical != null) overrides.put(TaskPriority.CRITICAL, critical);
-        if (high != null) overrides.put(TaskPriority.HIGH, high);
-        if (medium != null) overrides.put(TaskPriority.MEDIUM, medium);
-        if (low != null) overrides.put(TaskPriority.LOW, low);
-        return overrides.isEmpty() ? null : overrides;
+        return arrangementService.nextTask(projectId, authenticatedUserResolver.currentUserId());
     }
 }

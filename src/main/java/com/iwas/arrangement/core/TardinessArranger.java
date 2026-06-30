@@ -43,8 +43,7 @@ public class TardinessArranger {
                     ? Math.max(0.0, finish - best.dueHours()) : 0.0;
 
             result.add(new ArrangedTask(best.id(), position++, slack,
-                    start, finish, tardiness, best.processingHours() <= 0.0,
-                    buildReason(best, config, slack, pAverage)));
+                    start, finish, tardiness, best.processingHours() <= 0.0));
             remaining.remove(best);
         }
         return result;
@@ -59,19 +58,5 @@ public class TardinessArranger {
         for (AtcTask t : tasks) sum += t.processingHours();
         double mean = sum / tasks.size();
         return mean <= 0.0 ? 1.0 : mean;
-    }
-
-    private static String buildReason(AtcTask task, AtcConfig config, double slack, double pAverage) {
-        double valueDensity = config.weightOf(task.priority()) / task.processingHours();
-        String urgencyNote;
-        if (task.dueHours() == null) {
-            urgencyNote = "no deadline (sinks to the end of its tier)";
-        } else if (slack <= 0) {
-            urgencyNote = String.format(Locale.US, "maximum urgency (slack=%.1fh ≤ 0)", slack);
-        } else {
-            double urgency = AtcIndex.urgency(slack, pAverage, config);
-            urgencyNote = String.format(Locale.US, "%.1fh slack remaining (urgency factor=%.2f)", slack, urgency);
-        }
-        return String.format(Locale.US, "value density w/p=%.2f; %s", valueDensity, urgencyNote);
     }
 }

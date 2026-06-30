@@ -26,7 +26,7 @@ class TardinessArrangerTest {
         weights.put(TaskPriority.HIGH, 4.0);
         weights.put(TaskPriority.MEDIUM, 2.0);
         weights.put(TaskPriority.LOW, 1.0);
-        return new AtcConfig(weights, 2.0, 0.25, TaskPriority.LOW);
+        return new AtcConfig(weights, 2.0);
     }
 
     /** A: w8 p4 d6, B: w4 p2 d3, C: w1 p1 d10 → expected B, A, C. */

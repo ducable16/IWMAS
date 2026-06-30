@@ -42,7 +42,7 @@ class AtcValidationExperimentTest {
         weights.put(TaskPriority.HIGH, 4.0);
         weights.put(TaskPriority.MEDIUM, 2.0);
         weights.put(TaskPriority.LOW, 1.0);
-        return new AtcConfig(weights, k, 0.25, TaskPriority.LOW);
+        return new AtcConfig(weights, k);
     }
 
     @Test

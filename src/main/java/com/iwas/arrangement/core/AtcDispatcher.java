@@ -10,13 +10,13 @@ import java.util.Optional;
 @Component
 public class AtcDispatcher {
 
-    public Optional<AtcTask> nextTask(List<AtcTask> eligible, double t, AtcConfig config) {
-        if (eligible == null || eligible.isEmpty()) return Optional.empty();
+    public Optional<AtcTask> nextTask(List<AtcTask> atcTasks, double t, AtcConfig config) {
+        if (atcTasks == null || atcTasks.isEmpty()) return Optional.empty();
 
-        double pAverage = TardinessArranger.meanProcessing(eligible);
+        double pAverage = TardinessArranger.meanProcessing(atcTasks);
         AtcTask best = null;
         double bestIndex = Double.NEGATIVE_INFINITY;
-        for (AtcTask candidate : eligible) {
+        for (AtcTask candidate : atcTasks) {
             double index = AtcIndex.compute(candidate, t, pAverage, config);
             if (best == null || index > bestIndex + AtcIndex.EPS) {
                 best = candidate;
@@ -29,7 +29,7 @@ public class AtcDispatcher {
         return Optional.ofNullable(best);
     }
 
-    public Optional<AtcTask> nextTask(List<AtcTask> eligible, AtcConfig config) {
-        return nextTask(eligible, 0.0, config);
+    public Optional<AtcTask> nextTask(List<AtcTask> atcTasks, AtcConfig config) {
+        return nextTask(atcTasks, 0.0, config);
     }
 }

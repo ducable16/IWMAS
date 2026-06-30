@@ -108,7 +108,7 @@ public class WorkloadService {
 
     private List<ScheduledTask> atcOrder(List<Task> workable, BigDecimal dailyCap) {
         if (workable.isEmpty()) return List.of();
-        double cap = dailyCap != null ? dailyCap.doubleValue() : 0.0;
+        double cap = dailyCap.doubleValue();
         LocalDate today = LocalDate.now();
         AtcConfig config = AtcConfig.getDefault();
         List<AtcTask> atcTasks = workable.stream()

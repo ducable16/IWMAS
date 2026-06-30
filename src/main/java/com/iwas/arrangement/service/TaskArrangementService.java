@@ -47,15 +47,14 @@ public class TaskArrangementService {
     private final AtcDispatcher dispatcher;
 
     @Transactional(readOnly = true)
-    public ArrangeResponse arrangeLane(Long projectId, Long assigneeId,
-                                       Double kOverride, Map<TaskPriority, Double> weightOverrides) {
+    public ArrangeResponse arrangeLane(Long projectId, Long assigneeId) {
         Lane lane = loadLane(projectId, assigneeId);
-        AtcConfig config = AtcConfig.getDefault().withOverrides(kOverride, weightOverrides);
+        AtcConfig config = AtcConfig.getDefault();
         LocalDate today = LocalDate.now();
-        double orderingCap = lane.dailyCap() > 0 ? lane.dailyCap() : DAILY_HOURS;
+        double dailyCap = lane.dailyCap();
 
         List<AtcTask> atcTasks = lane.workable().stream()
-                .map(t -> AtcTaskMapper.from(t, today, orderingCap))
+                .map(t -> AtcTaskMapper.from(t, today, dailyCap))
                 .toList();
         List<ArrangedTask> arranged = arranger.arrange(atcTasks, config);
 
@@ -81,28 +80,26 @@ public class TaskArrangementService {
                     a.projectedTardinessHours(),
                     sched != null ? sched.lateByWorkdays() : 0,
                     sched != null && sched.willSlip(),
-                    a.estimateDefaulted(),
-                    a.reason()));
+                    a.estimateDefaulted()));
         }
 
         return new ArrangeResponse(projectId, assigneeId, lane.alloc(),
-                capacityBd(lane.dailyCap()), config.k(), items);
+                capacityBd(lane.dailyCap()), items);
     }
 
     @Transactional(readOnly = true)
-    public NextTaskResponse nextTask(Long projectId, Long assigneeId,
-                                     Double kOverride, Map<TaskPriority, Double> weightOverrides) {
+    public NextTaskResponse nextTask(Long projectId, Long assigneeId) {
         Lane lane = loadLane(projectId, assigneeId);
         if (lane.workable().isEmpty()) return NextTaskResponse.empty(projectId, assigneeId);
 
-        AtcConfig config = AtcConfig.getDefault().withOverrides(kOverride, weightOverrides);
+        AtcConfig config = AtcConfig.getDefault();
         LocalDate today = LocalDate.now();
-        double orderingCap = lane.dailyCap() > 0 ? lane.dailyCap() : DAILY_HOURS;
+        double dailyCap = lane.dailyCap();
 
-        List<AtcTask> eligible = lane.workable().stream()
-                .map(t -> AtcTaskMapper.from(t, today, orderingCap))
+        List<AtcTask> atcTasks = lane.workable().stream()
+                .map(t -> AtcTaskMapper.from(t, today, dailyCap))
                 .toList();
-        Optional<AtcTask> next = dispatcher.nextTask(eligible, config);
+        Optional<AtcTask> next = dispatcher.nextTask(atcTasks, config);
         if (next.isEmpty()) return NextTaskResponse.empty(projectId, assigneeId);
 
         long nextId = next.get().id();
@@ -114,8 +111,7 @@ public class TaskArrangementService {
         }
         if(nextTask == null) throw new NoSuchElementException("No value present");
         return new NextTaskResponse(projectId, assigneeId, false,
-                nextTask.getId(), nextTask.getTitle(), nextTask.getPriority(),
-                reasonFor(nextTask, today, orderingCap, config));
+                nextTask.getId(), nextTask.getTitle(), nextTask.getPriority());
     }
 
     private record Lane(Integer alloc, double dailyCap, List<Task> workable) {
@@ -156,23 +152,12 @@ public class TaskArrangementService {
     }
 
     private static double dailyCapHours(Integer alloc) {
-        if (alloc == null || alloc <= 0) return 0.0;
+        if (alloc == null || alloc <= 0) return 1.0; // default
         return DAILY_HOURS * alloc / 100.0;
     }
 
     private static BigDecimal capacityBd(double dailyCap) {
         if (dailyCap <= 0) return null;
         return BigDecimal.valueOf(dailyCap).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private static String reasonFor(Task task, LocalDate today, double cap,
-                                    AtcConfig config) {
-        AtcTask atc = AtcTaskMapper.from(task, today, cap);
-        double slack = AtcIndex.slack(atc, 0.0);
-        double valueDensity = config.weightOf(task.getPriority()) / atc.processingHours();
-        String urgency = slack <= 0
-                ? String.format(Locale.US, "maximum urgency (slack=%.1fh)", slack)
-                : String.format(Locale.US, "%.1fh slack remaining", slack);
-        return String.format(Locale.US, "value density w/p=%.2f; %s", valueDensity, urgency);
     }
 }

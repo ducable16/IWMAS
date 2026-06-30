@@ -19,7 +19,7 @@ class AtcIndexTest {
         weights.put(TaskPriority.HIGH, 4.0);
         weights.put(TaskPriority.MEDIUM, 2.0);
         weights.put(TaskPriority.LOW, 1.0);
-        return new AtcConfig(weights, 2.0, 0.25, TaskPriority.LOW);
+        return new AtcConfig(weights, 2.0);
     }
 
     @Test
@@ -55,12 +55,5 @@ class AtcIndexTest {
     void noDeadlineDrivesUrgencyToZero() {
         AtcTask noDue = new AtcTask(1L, TaskPriority.HIGH, 2, null);
         assertEquals(0.0, AtcIndex.compute(noDue, 0, 3.0, config()), 1e-9);
-    }
-
-    @Test
-    void zeroEstimateIsFlooredNotDividedByZero() {
-        AtcTask zero = new AtcTask(1L, TaskPriority.HIGH, 0, 5.0);
-        double index = AtcIndex.compute(zero, 0, 3.0, config());
-        assertTrue(Double.isFinite(index) && index > 0, "index must be finite, was " + index);
     }
 }
