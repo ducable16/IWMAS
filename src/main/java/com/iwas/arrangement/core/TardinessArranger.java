@@ -8,25 +8,9 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-/**
- * Static ATC construction heuristic for {@code 1 ‖ ΣwⱼTⱼ}. Builds a full
- * execution order in one pass: at each step it picks the unscheduled task with
- * the highest {@link AtcIndex}, advances the clock by that task's processing
- * time (non-preemptive, non-idling) and repeats.
- *
- * <p>This produces a <em>high-quality heuristic</em> order, not a proven
- * optimum — the underlying problem is strongly NP-hard. The mean processing
- * time {@code p̄} that normalises the slack scale is recomputed each step over
- * the tasks still waiting, matching the original rule's "average processing
- * time of the waiting jobs" (Rachamadugu &amp; Morton 1981).
- *
- * <p>Pure and deterministic: same input + config always yields the same order.
- */
 @Component
 public class TardinessArranger {
 
-    /** Full arrangement with explainability metadata for every task. */
     public List<ArrangedTask> arrange(List<AtcTask> tasks, AtcConfig config) {
         List<ArrangedTask> result = new ArrayList<>();
         if (tasks == null || tasks.isEmpty()) return result;
@@ -66,12 +50,10 @@ public class TardinessArranger {
         return result;
     }
 
-    /** Just the ordered task ids — used when only the sequence is needed. */
     public List<Long> orderTaskIds(List<AtcTask> tasks, AtcConfig config) {
         return arrange(tasks, config).stream().map(ArrangedTask::taskId).toList();
     }
 
-    /** Mean effective processing time; guarded to ≥ 1 so the slack scale is finite. */
     public static double meanProcessing(List<AtcTask> tasks) {
         double sum = 0.0;
         for (AtcTask t : tasks) sum += t.processingHours();

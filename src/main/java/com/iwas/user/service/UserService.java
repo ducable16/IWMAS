@@ -184,11 +184,6 @@ public class UserService {
         return authService.toMeResponse(user);
     }
 
-    /**
-     * Keeps the {@code iwas-users} Elasticsearch index in sync after a searchable-field
-     * change. Active, non-deleted users are upserted (the index holds only active users);
-     * deactivated/deleted users are removed.
-     */
     private void syncUserIndex(User user) {
         boolean searchable = Boolean.TRUE.equals(user.getIsActive())
                 && !Boolean.TRUE.equals(user.getIsDeleted());

@@ -33,15 +33,6 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Orchestrates the ATC task-arrangement use cases for a single member lane:
- * loads the lane, reduces it to {@link AtcTask}s, runs the heuristic and
- * enriches the result with calendar projections from the workload simulator.
- *
- * <p>Output is advisory and never persisted (the suggested order does not touch
- * {@code executionSeq}); a member applies it through the existing
- * schedule-save endpoint if they want.
- */
 @Service
 @RequiredArgsConstructor
 public class TaskArrangementService {
@@ -55,7 +46,6 @@ public class TaskArrangementService {
     private final TardinessArranger arranger;
     private final AtcDispatcher dispatcher;
 
-    /** Static arrangement — suggested execution order for the lane. */
     @Transactional(readOnly = true)
     public ArrangeResponse arrangeLane(Long projectId, Long assigneeId,
                                        Double kOverride, Map<TaskPriority, Double> weightOverrides) {
@@ -99,7 +89,6 @@ public class TaskArrangementService {
                 capacityBd(lane.dailyCap()), config.k(), items);
     }
 
-    /** Online dispatch — the task the member should pick up next, right now. */
     @Transactional(readOnly = true)
     public NextTaskResponse nextTask(Long projectId, Long assigneeId,
                                      Double kOverride, Map<TaskPriority, Double> weightOverrides) {
@@ -129,8 +118,6 @@ public class TaskArrangementService {
                 reasonFor(nextTask, today, orderingCap, config));
     }
 
-    // ─── lane loading ─────────────────────────────────────────────────────────
-
     private record Lane(Integer alloc, double dailyCap, List<Task> workable) {
     }
 
@@ -149,7 +136,6 @@ public class TaskArrangementService {
         return new Lane(alloc, dailyCapHours(alloc), workable);
     }
 
-    /** Runs the workload simulator over the ATC-ordered tasks to attach calendar dates. */
     private Map<Long, TaskSchedule> projectCalendar(double dailyCap,
                                                     List<ScheduledTask> ordered,
                                                     LocalDate today) {
@@ -158,8 +144,6 @@ public class TaskArrangementService {
         return sim.schedules().stream()
                 .collect(Collectors.toMap(TaskSchedule::taskId, ts -> ts));
     }
-
-    // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static ScheduledTask toScheduledTask(Task t) {
         return new ScheduledTask(t.getId(), t.getProjectId(), t.getEstimatedHours(),
@@ -171,7 +155,6 @@ public class TaskArrangementService {
         return est != null && est.signum() > 0;
     }
 
-    /** Daily lane capacity in hours: 8h × allocation%; 0 when there is no allocation. */
     private static double dailyCapHours(Integer alloc) {
         if (alloc == null || alloc <= 0) return 0.0;
         return DAILY_HOURS * alloc / 100.0;

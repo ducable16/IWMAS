@@ -52,7 +52,6 @@ public class Task extends BaseEntity {
     @Column(name = "estimated_hours", precision = 6, scale = 1)
     private BigDecimal estimatedHours;
 
-    /** Member's planned execution order within their (assignee, project) lane. Null tasks fall back to EDD ordering. */
     @Column(name = "execution_seq")
     private Integer executionSeq;
 

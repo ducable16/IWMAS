@@ -1,11 +1,5 @@
 package com.iwas.task.enums;
 
-/**
- * Types of activity recorded in a task's unified history feed.
- * Field-change types carry the before/after values in
- * {@code old_value}/{@code new_value}; event types (created, deleted,
- * attachment add/remove) use only the value that applies.
- */
 public enum TaskActivityType {
     TASK_CREATED,
     STATUS_CHANGED,

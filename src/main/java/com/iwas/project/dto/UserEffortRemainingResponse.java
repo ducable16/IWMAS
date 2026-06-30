@@ -21,20 +21,10 @@ public class UserEffortRemainingResponse {
 
     private List<AllocationEntry> overlappingAllocations;
 
-    /**
-     * Upcoming dates when this user's capacity will increase (a project ends).
-     * Always computed — intended for the quick note below the allocation form.
-     */
     private List<FutureAvailabilityNote> futureAvailabilityNotes;
 
-    /**
-     * Full chronological allocation timeline as ordered segments.
-     * Only populated when the request includes {@code detail=true}.
-     * Null otherwise to keep the default response lightweight.
-     */
     private List<TimelineSegment> allocationTimeline;
 
-    // --- inner types ---
 
     @Data
     @Builder
@@ -50,33 +40,25 @@ public class UserEffortRemainingResponse {
     @Data
     @Builder
     public static class FutureAvailabilityNote {
-        /** First day the extra capacity is available. */
         private LocalDate availableFrom;
-        /** How many percent-points become free at this date. */
         private int additionalFreePercent;
-        /** Cumulative remaining capacity from this date onward (before any new assignments). */
         private int cumulativeRemainingPercent;
-        /** Projects that finish just before this date, releasing the capacity. */
         private List<ProjectRef> triggeringProjects;
     }
 
     @Data
     @Builder
     public static class TimelineSegment {
-        /** First day of this segment. */
         private LocalDate from;
-        /** Last day of this segment; null means open-ended. */
         private LocalDate to;
         private int allocatedPercent;
         private int remainingPercent;
-        /** What changed at the start of this segment (which projects started or ended). */
         private ChangeSummary changeSummary;
     }
 
     @Data
     @Builder
     public static class ChangeSummary {
-        /** Net delta at segment boundary: negative = capacity freed, positive = capacity consumed. */
         private int deltaPercent;
         private List<ProjectRef> startingProjects;
         private List<ProjectRef> endingProjects;

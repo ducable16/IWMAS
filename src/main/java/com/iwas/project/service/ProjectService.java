@@ -64,7 +64,6 @@ public class ProjectService {
     public ProjectPageResponse searchProjects(ProjectFilterRequest filter) {
         String role = authenticatedUserResolver.currentUserRole();
         if ("PROJECT_MANAGER".equals(role)) {
-            // PM sees only projects they manage
             filter.setManagerId(authenticatedUserResolver.currentUserId());
         }
 
@@ -184,11 +183,6 @@ public class ProjectService {
         project.setStartDate(request.getStartDate());
         project.setEndDate(request.getEndDate());
 
-        // Build the PM's PROJECT_MANAGER membership and validate its effort first (fail-fast, before anything is
-        // persisted). The candidate window is the PM membership's own [joinDate, leaveDate] window
-        // (joinDate = project start or today; leaveDate null -> project end). Throws
-        // PROJECT_MEMBER_ALLOC_REQUIRED when null/<=0 and USER_OVER_ALLOCATED when over capacity; any
-        // failure rolls back the whole transaction, so we never leave a project without its PM member.
         ProjectMember pmMember = new ProjectMember();
         pmMember.setUserId(request.getManagerId());
         pmMember.setRoleInProject(ProjectRoleInProject.PROJECT_MANAGER);
@@ -212,7 +206,6 @@ public class ProjectService {
         project.setManagerId(request.getManagerId());
         Project saved = projectRepository.save(project);
 
-        // Atomically add the PM (managerId) as a PROJECT_MANAGER member with the requested effort.
         pmMember.setProjectId(saved.getId());
         projectMemberRepository.save(pmMember);
 
@@ -231,8 +224,6 @@ public class ProjectService {
             }
         }
 
-        // Manager is immutable: the PM's PROJECT_MANAGER membership + effort allocation are set atomically at
-        // creation, and update does not manage membership. Reject any attempt to change managerId.
         if (request.getManagerId() != null && !request.getManagerId().equals(project.getManagerId())) {
             throw new AppException(ErrorCode.PROJECT_MANAGER_IMMUTABLE);
         }
@@ -246,18 +237,6 @@ public class ProjectService {
         projectIndexEventPublisher.publish(toUpsertEvent(saved));
         return toProjectResponse(saved);
     }
-
-    /**
-     * Hands the project over to a new PM. Unlike {@link #updateProject} (where managerId is immutable),
-     * this dedicated flow also rebuilds the PROJECT_MANAGER membership and reassigns work:
-     * <ol>
-     *   <li>The new manager joins as a fresh PROJECT_MANAGER member with the requested effort allocation,
-     *       validated up-front (fail-fast) against their peak-concurrent capacity.</li>
-     *   <li>The outgoing manager is removed from the project (their PROJECT_MANAGER membership is soft-deleted).</li>
-     *   <li>Every active task still assigned to the outgoing manager is reassigned to the new manager.</li>
-     * </ol>
-     * The new manager must not already be a member of the project.
-     */
     @Transactional
     public ProjectResponse changeManager(Long projectId, ProjectManagerChangeRequest request) {
         Project project = findProject(projectId);
@@ -268,15 +247,11 @@ public class ProjectService {
             throw new AppException(ErrorCode.PROJECT_MANAGER_UNCHANGED);
         }
 
-        // The incoming manager must hold the PROJECT_MANAGER system role (also rejects unknown/deleted users).
         requireUserRoleFor(newManagerId, ProjectRoleInProject.PROJECT_MANAGER);
 
-        // The incoming PM always joins fresh — reject if they are already an active member.
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, newManagerId)
                 .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
 
-        // Build + validate the new PM's PROJECT_MANAGER membership first, mirroring createProject: any capacity
-        // failure rolls back before we touch the old manager, so the project never loses its PM.
         ProjectMember newPmMember = new ProjectMember();
         newPmMember.setProjectId(projectId);
         newPmMember.setUserId(newManagerId);
@@ -286,15 +261,12 @@ public class ProjectService {
         checkAllocationLimit(newPmMember.getUserId(), newPmMember.getAllocatedEffortPercent(),
                 membershipStart(newPmMember, project), membershipEnd(newPmMember, project), null);
 
-        // Remove the outgoing manager from the project (soft-delete their membership).
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, oldManagerId)
                 .ifPresent(pm -> {
                     pm.setIsDeleted(true);
                     projectMemberRepository.save(pm);
                 });
 
-        // Unassign the outgoing manager's still-active tasks: a project manager cannot be a task
-        // assignee, so they must not be carried over to the incoming manager either.
         List<com.iwas.task.entity.Task> tasks =
                 taskRepository.findActiveTasksByProjectIdAndAssigneeId(projectId, oldManagerId);
         if (!tasks.isEmpty()) {
@@ -346,7 +318,6 @@ public class ProjectService {
         projectMemberRepository.findByProjectIdAndUserIdAndIsDeletedFalse(projectId, request.getUserId())
                 .ifPresent(pm -> { throw new AppException(ErrorCode.PROJECT_MEMBER_ALREADY_EXISTS); });
 
-        // System role must match the requested project role (TEAM_MEMBER -> MEMBER, PROJECT_MANAGER -> PM).
         requireUserRoleFor(request.getUserId(), request.getRoleInProject());
 
         ProjectMember member = new ProjectMember();
@@ -357,7 +328,6 @@ public class ProjectService {
         member.setJoinDate(request.getJoinDate() != null ? request.getJoinDate() : LocalDate.now());
         member.setNote(request.getNote());
 
-        // Validate against peak concurrent allocation over this membership's own window.
         checkAllocationLimit(member.getUserId(), member.getAllocatedEffortPercent(),
                 membershipStart(member, project), membershipEnd(member, project), null);
 
@@ -380,10 +350,7 @@ public class ProjectService {
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_MEMBER_NOT_FOUND));
 
         Project project = findProject(projectId);
-        // The (possibly changed) project role must still match the member's system role.
         requireUserRoleFor(member.getUserId(), request.getRoleInProject());
-        // Window = this membership's own [joinDate, leaveDate] (update does not change those);
-        // the membership itself is excluded from the existing-load sweep via memberId.
         checkAllocationLimit(member.getUserId(), request.getAllocatedEffortPercent(),
                 membershipStart(member, project), membershipEnd(member, project), memberId);
 
@@ -396,13 +363,6 @@ public class ProjectService {
         return toMemberResponse(projectMemberRepository.save(member), userName);
     }
 
-    /**
-     * Enforces that a user's system role is compatible with the project role they are about to hold.
-     * A PROJECT_MANAGER membership requires {@link UserRole#PROJECT_MANAGER}; any other (MEMBER)
-     * membership requires {@link UserRole#TEAM_MEMBER}. ADMIN and HR are administrative roles and
-     * may neither manage a project nor join one as a member. A null/absent {@code roleInProject} is
-     * treated as MEMBER, matching the request and entity defaults.
-     */
     private void requireUserRoleFor(Long userId, ProjectRoleInProject roleInProject) {
         UserRole userRole = userRepository.findById(userId)
                 .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
@@ -417,21 +377,6 @@ public class ProjectService {
         }
     }
 
-    /**
-     * Acquires a row-level lock on the user row, then validates that allocating newAllocation%
-     * over the candidate window [newStart, newEnd] would not push the user's PEAK CONCURRENT
-     * allocation above 100% at any point inside that window.
-     *
-     * <p>All of the user's non-soft-deleted memberships on projects that are not COMPLETED/CANCELLED
-     * are considered, each weighted over its own [joinDate, leaveDate] window (a past leaveDate simply
-     * means the membership no longer overlaps the candidate window and drops out).
-     * This matches the peak-concurrent semantics of the effort-remaining panel
-     * ({@link #getUserEffortRemaining}) rather than a date-agnostic flat sum. Null project dates
-     * are treated as open-ended (effectively "always active").
-     *
-     * <p>The lock serializes concurrent allocation changes for the same user within the
-     * surrounding {@link Transactional} boundary.
-     */
     private void checkAllocationLimit(Long userId, Integer newAllocation,
                                       LocalDate newStart, LocalDate newEnd, Long excludeMemberId) {
         if (newAllocation == null || newAllocation <= 0) {
@@ -449,17 +394,12 @@ public class ProjectService {
                 .filter(pm -> pm.getAllocatedEffortPercent() != null && pm.getAllocatedEffortPercent() > 0)
                 .toList();
         if (memberships.isEmpty()) {
-            return; // nothing else allocated; newAllocation (<=100) always fits
+            return;
         }
 
         Map<Long, Project> projects = projectRepository
                 .findAllById(memberships.stream().map(ProjectMember::getProjectId).toList())
                 .stream().collect(Collectors.toMap(Project::getId, p -> p));
-
-        // Sweep existing allocations clamped to the candidate window; find the peak concurrent
-        // load that the new allocation would stack on top of. Each membership is weighted over its
-        // own [joinDate, leaveDate] window (falling back to the project timeline), so a membership
-        // with a future leaveDate still counts until then, and one that has already ended drops out.
         TreeMap<LocalDate, Integer> deltas = new TreeMap<>();
         for (ProjectMember pm : memberships) {
             Project p = projects.get(pm.getProjectId());
@@ -468,7 +408,7 @@ public class ProjectService {
 
             LocalDate s = membershipStart(pm, p);
             LocalDate e = membershipEnd(pm, p);
-            if (s.isAfter(windowEnd) || e.isBefore(windowStart)) continue; // no overlap with candidate window
+            if (s.isAfter(windowEnd) || e.isBefore(windowStart)) continue;
 
             LocalDate clampedStart = s.isBefore(windowStart) ? windowStart : s;
             LocalDate clampedEnd   = e.isAfter(windowEnd)    ? windowEnd   : e;
@@ -487,17 +427,14 @@ public class ProjectService {
         }
     }
 
-    /** Open-ended sentinels for allocations whose start/end dates are unknown (null). */
     private static final LocalDate MIN_ALLOC_DATE = LocalDate.of(2000, 1, 1);
     private static final LocalDate MAX_ALLOC_DATE = LocalDate.of(9999, 12, 30);
 
-    /** First day a membership consumes capacity: its joinDate, else the project start, else open. */
     private LocalDate membershipStart(ProjectMember pm, Project p) {
         if (pm.getJoinDate() != null) return pm.getJoinDate();
         return p.getStartDate() != null ? p.getStartDate() : MIN_ALLOC_DATE;
     }
 
-    /** Last day a membership consumes capacity (inclusive): its leaveDate, else the project end, else open. */
     private LocalDate membershipEnd(ProjectMember pm, Project p) {
         if (pm.getLeaveDate() != null) return pm.getLeaveDate();
         return p.getEndDate() != null ? p.getEndDate() : MAX_ALLOC_DATE;
@@ -519,7 +456,6 @@ public class ProjectService {
         }
     }
 
-    // --- Search index helpers ---
 
     private ProjectIndexEvent toUpsertEvent(Project p) {
         return ProjectIndexEvent.builder()
@@ -532,7 +468,6 @@ public class ProjectService {
                 .build();
     }
 
-    // --- Member search ---
 
     public Set<Long> getExistingParticipantIds(Long projectId) {
         Project project = findProject(projectId);
@@ -542,17 +477,6 @@ public class ProjectService {
         ids.add(project.getManagerId());
         return ids;
     }
-
-    /**
-     * Distinct active participants across every project the current user manages
-     * ({@code managerId = currentUser}). Replaces the FE's N+1 pattern of calling
-     * {@code GET /projects/my} and then {@code GET /projects/{id}/members} per project:
-     * a user that belongs to several of the manager's projects appears exactly once.
-     *
-     * <p>Scope is the manager's own (non-deleted) projects. "Active" mirrors the assignee-eligible
-     * set elsewhere: not soft-deleted and not yet left ({@code leaveDate} null or in the future).
-     * The manager themselves is always included.
-     */
     public List<UserMeResponse> getMyManagedProjectMembers() {
         Long managerId = authenticatedUserResolver.currentUserId();
         List<Long> projectIds = projectRepository.findByManagerId(managerId)
@@ -575,8 +499,6 @@ public class ProjectService {
         Project project = findProject(projectId);
         requireProjectAccess(projectId);
 
-        // Active participants only = manager + active members (leaveDate IS NULL or still in the future),
-        // matching task-assignee eligibility (ProjectService.isProjectParticipant).
         Set<Long> participantIds = new HashSet<>();
         if (project.getManagerId() != null) {
             participantIds.add(project.getManagerId());
@@ -600,12 +522,6 @@ public class ProjectService {
                 .map(userMapper::toUserMeResponse)
                 .toList();
     }
-
-    /**
-     * Narrows {@code participantIds} to those owning ALL of {@code requiredSkills}, each at
-     * its minimum level or higher (AND across skills). Returns the input set unchanged when
-     * no skill constraints are given.
-     */
     private Set<Long> filterByRequiredSkills(Set<Long> participantIds, List<RequiredSkill> requiredSkills) {
         if (requiredSkills == null || requiredSkills.isEmpty()) {
             return participantIds;
@@ -622,7 +538,6 @@ public class ProjectService {
         return result;
     }
 
-    // --- Access control helpers ---
 
     public boolean isManagerOf(Long projectId, Long userId) {
         return projectRepository.findById(projectId)
@@ -646,10 +561,6 @@ public class ProjectService {
         }
     }
 
-    /**
-     * Returns the IDs of projects the current user may access.
-     * Returns null for ADMIN (no filter needed — all projects accessible).
-     */
     public List<Long> getAccessibleProjectIds() {
         String role = authenticatedUserResolver.currentUserRole();
         Long userId = authenticatedUserResolver.currentUserId();
@@ -669,7 +580,6 @@ public class ProjectService {
                 .stream().map(Project::getId).toList();
     }
 
-    // --- Effort remaining ---
 
     public UserEffortRemainingResponse getUserEffortRemaining(Long userId, LocalDate startDate,
                                                                LocalDate endDate, boolean detail) {
@@ -691,7 +601,6 @@ public class ProjectService {
                     if (p == null) return false;
                     if (p.getStatus() == ProjectStatus.COMPLETED || p.getStatus() == ProjectStatus.CANCELLED) return false;
                     if (startDate == null && endDate == null) return true;
-                    // Weigh by the member's own [joinDate, leaveDate] window, not the raw project dates.
                     return periodsOverlap(membershipStart(pm, p), membershipEnd(pm, p), startDate, endDate);
                 })
                 .toList();
@@ -753,11 +662,6 @@ public class ProjectService {
         return !s1AfterE2 && !s2AfterE1;
     }
 
-    /**
-     * Sweep-line over allocation intervals.
-     * Always builds futureAvailabilityNotes (lightweight).
-     * Builds allocationTimeline only when detail=true.
-     */
     private SweepResult buildSweepResult(List<AllocationInterval> intervals, boolean detail) {
         if (intervals.isEmpty()) {
             return new SweepResult(0, List.of(), detail ? List.of() : null);
@@ -786,7 +690,6 @@ public class ProjectService {
             running += delta;
             peak = Math.max(peak, running);
 
-            // Note: capacity freed in the future
             if (delta < 0 && date.isAfter(today)) {
                 List<AllocationInterval> ending = endsByDate.getOrDefault(date, List.of());
                 futureNotes.add(UserEffortRemainingResponse.FutureAvailabilityNote.builder()
@@ -797,7 +700,6 @@ public class ProjectService {
                         .build());
             }
 
-            // Timeline segment: from this event date to the day before the next
             if (detail) {
                 LocalDate segEnd = idx + 1 < sortedDates.size()
                         ? sortedDates.get(idx + 1).minusDays(1)
@@ -837,7 +739,6 @@ public class ProjectService {
                                 List<UserEffortRemainingResponse.FutureAvailabilityNote> futureNotes,
                                 List<UserEffortRemainingResponse.TimelineSegment> timeline) {}
 
-    // --- Private helpers ---
 
     private Project findProject(Long id) {
         return projectRepository.findById(id)

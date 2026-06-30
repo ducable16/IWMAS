@@ -44,17 +44,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Workload v3 — serial scheduling simulation.
- *
- * Each member is modelled as a set of independent project lanes; lane
- * capacity is {@code 8h × allocation%} and never subsidises another lane.
- * Per lane, {@link ScheduleSimulator} forecasts task finish dates and slip
- * risk; the per-member badge is the worst lane badge.
- *
- * A task's outstanding work is {@code estimatedHours}. The model derives load
- * from this single number plus the schedule.
- */
 @Service
 @RequiredArgsConstructor
 public class WorkloadService {
@@ -69,19 +58,14 @@ public class WorkloadService {
 
     private static final double DEFAULT_DAILY_HOURS = 8.0;
 
-    // ─── task helpers ─────────────────────────────────────────────────────────
-
-    /** Outstanding effort: the task's estimate. */
     static BigDecimal resolveRemaining(Task t) {
         return t.getEstimatedHours();
     }
 
-    /** A task with no usable estimate — load is unknown. */
     static boolean isUnestimated(Task t) {
         return t.getEstimatedHours() == null || t.getEstimatedHours().signum() <= 0;
     }
 
-    /** Has positive outstanding effort — participates in the simulation. */
     private static boolean isWorkable(Task t) {
         BigDecimal est = t.getEstimatedHours();
         return est != null && est.signum() > 0;
@@ -96,15 +80,12 @@ public class WorkloadService {
                 t.getStartDate(), t.getDueDate(), t.getPriority());
     }
 
-    /** Daily lane capacity: null = no allocation row, ZERO = observer, else 8h × alloc%. */
     private static BigDecimal capacityOf(Integer alloc) {
         if (alloc == null) return null;
         if (alloc == 0) return BigDecimal.ZERO;
         return BigDecimal.valueOf(DEFAULT_DAILY_HOURS * alloc / 100.0)
                 .setScale(2, RoundingMode.HALF_UP);
     }
-
-    // ─── per-lane computation ─────────────────────────────────────────────────
 
     private record LaneLoad(ProjectAllocationItem item,
                             BigDecimal backlogDays,
@@ -113,12 +94,6 @@ public class WorkloadService {
                             int unestimatedCount,
                             List<TaskWorkloadItem> taskItems) {}
 
-    /**
-     * Orders a lane's workable tasks. Uses the member's saved executionSeq only
-     * when every workable task has one (a complete custom plan); otherwise falls
-     * back to the ATC heuristic suggestion. The order is a forecasting hint, not
-     * an execution constraint.
-     */
     private List<ScheduledTask> orderLane(List<Task> workable, BigDecimal dailyCap) {
         boolean allHaveSeq = !workable.isEmpty()
                 && workable.stream().allMatch(t -> t.getExecutionSeq() != null);
@@ -131,12 +106,6 @@ public class WorkloadService {
         return atcOrder(workable, dailyCap);
     }
 
-    /**
-     * System-suggested order via the ATC (Apparent Tardiness Cost) heuristic for
-     * total weighted tardiness — a high-performance heuristic, not a proven
-     * optimum. Deadlines are measured in the lane's capacity-hours so slack and
-     * processing time share one unit.
-     */
     private List<ScheduledTask> atcOrder(List<Task> workable, BigDecimal dailyCap) {
         if (workable.isEmpty()) return List.of();
         double cap = dailyCap != null ? dailyCap.doubleValue() : 0.0;
@@ -158,7 +127,6 @@ public class WorkloadService {
         boolean hasCapacity = dailyCapacity != null && dailyCapacity.signum() > 0;
 
         List<Task> workable = laneTasks.stream().filter(WorkloadService::isWorkable).toList();
-        // Workload axis: backlog volume — deadline-agnostic, order-independent.
         BigDecimal backlogHours = BigDecimal.ZERO;
 
         for (Task task : workable) {
@@ -174,8 +142,6 @@ public class WorkloadService {
 
         if (hasCapacity) {
             backlogDays = backlogHours.divide(dailyCapacity, 2, RoundingMode.HALF_UP);
-            // Risk axis: simulate to find slips. startDate no longer gates, so every workable
-            // task is scheduled from today in ATC (or the member's saved) order.
             LaneSimulation sim = scheduleSimulator.simulate(orderLane(workable, dailyCapacity), dailyCapacity, today);
             for (TaskSchedule ts : sim.schedules()) scheduleByTask.put(ts.taskId(), ts);
             predictedLate = (int) sim.schedules().stream()
@@ -212,11 +178,6 @@ public class WorkloadService {
                 .orElse(null);
     }
 
-    /**
-     * A future slip: the simulation predicts the task misses its deadline, and that deadline
-     * is today or later. Already-overdue tasks (due date in the past) are excluded here — they
-     * are counted by {@code overdueCount} instead, so we don't double-count them as predicted-late.
-     */
     private static boolean isFutureSlip(TaskSchedule ts, List<Task> laneTasks, LocalDate today) {
         if (!ts.willSlip()) return false;
         LocalDate due = dueDateOf(ts.taskId(), laneTasks);
@@ -243,8 +204,6 @@ public class WorkloadService {
                 .unestimated(unestimated)
                 .build();
     }
-
-    // ─── per-member aggregation ───────────────────────────────────────────────
 
     private record MemberLoad(BigDecimal worstBacklogDays,
                               int atRiskCount,
@@ -325,12 +284,6 @@ public class WorkloadService {
         return a.max(b);
     }
 
-    // ─── public read endpoints ────────────────────────────────────────────────
-
-    /**
-     * Real-time workload for all active participants of a project, scoped to that
-     * project's lane only. Caller must be the project manager.
-     */
     public List<ProjectMemberWorkloadResponse> getProjectMembersWorkload(Long projectId, Long requestingUserId) {
 
         Project project = projectRepository.findById(projectId).orElseThrow(() -> new AppException(ErrorCode.PROJECT_NOT_FOUND));
@@ -374,11 +327,6 @@ public class WorkloadService {
         return result;
     }
 
-    /**
-     * Real-time load for a single user — aggregate + per-project lanes + task list.
-     * When {@code restrictToManagerId} is non-null, only lanes whose project is managed
-     * by that user are included (used by the PM-facing endpoint).
-     */
     public MemberWorkloadResponse getUserWorkloadRealtime(Long userId, Long restrictToManagerId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -387,11 +335,6 @@ public class WorkloadService {
         return toMemberResponse(user, ml, ml.projectItems(), ml.taskItems());
     }
 
-    /**
-     * Daily deadline-risk check for one member: runs the simulation and, when any task is
-     * overdue or predicted to slip ({@code atRiskCount > 0}), sends an OVERLOAD_WARNING.
-     * Computes live — nothing is persisted.
-     */
     @Transactional
     public void evaluateOverload(Long userId) {
         User user = userRepository.findById(userId)
@@ -406,8 +349,6 @@ public class WorkloadService {
                     "WORKLOAD", userId);
         }
     }
-
-    // ─── what-if scheduling (single member, single project lane) ──────────────
 
     private record ScheduleContext(User user, Project project, ProjectMember pmRow,
                                    Integer alloc, BigDecimal dailyCap,
@@ -469,7 +410,6 @@ public class WorkloadService {
         for (Task t : ctx.laneTasks()) {
             itemById.put(t.getId(), toTaskItem(t, today, scheduleByTask.get(t.getId())));
         }
-        // Schedulable tasks in execution order, then the rest (done / unestimated).
         List<TaskWorkloadItem> items = new ArrayList<>();
         Set<Long> placed = new HashSet<>();
         for (ScheduledTask st : ordered) {
@@ -494,7 +434,6 @@ public class WorkloadService {
                 .build();
     }
 
-    /** Current saved schedule for the member's lane (saved executionSeq, else EDD). */
     public ProjectScheduleResponse getMySchedule(Long userId, Long projectId) {
         LocalDate today = LocalDate.now();
         ScheduleContext ctx = loadScheduleContext(userId, projectId);
@@ -503,7 +442,6 @@ public class WorkloadService {
         return buildProjectSchedule(ctx, orderLane(ctx.workable(), ctx.dailyCap()), saved, today);
     }
 
-    /** ATC heuristic order suggestion — a preview, not persisted. */
     public ProjectScheduleResponse suggestSchedule(Long userId, Long projectId) {
         LocalDate today = LocalDate.now();
         ScheduleContext ctx = loadScheduleContext(userId, projectId);
@@ -513,7 +451,6 @@ public class WorkloadService {
         return buildProjectSchedule(ctx, ordered, false, today);
     }
 
-    /** Simulates a member-proposed order without persisting it. */
     public ProjectScheduleResponse previewSchedule(Long userId, Long projectId,
                                                    List<Long> orderedTaskIds) {
         LocalDate today = LocalDate.now();
@@ -522,7 +459,6 @@ public class WorkloadService {
                 false, today);
     }
 
-    /** Persists the member-proposed order as executionSeq, then returns the simulation. */
     @Transactional
     public ProjectScheduleResponse saveSchedule(Long userId, Long projectId,
                                                 List<Long> orderedTaskIds) {
@@ -541,16 +477,8 @@ public class WorkloadService {
         return buildProjectSchedule(ctx, ordered, true, today);
     }
 
-    // ─── recommender hook ─────────────────────────────────────────────────────
-
     private static final long CANDIDATE_TASK_ID = -1L;
 
-    /**
-     * What-if for the assignee recommender: the workload impact of giving the
-     * candidate one hypothetical task. Re-runs the lane simulation with the
-     * task appended in EDD order; persists nothing. Provided for the
-     * recommender to read availability — not itself wired into TOPSIS scoring.
-     */
     public CandidateWorkloadImpact simulateWithCandidateTask(
             Long userId, Long projectId, BigDecimal estimatedHours,
             LocalDate startDate, LocalDate dueDate, TaskPriority priority) {
@@ -594,7 +522,6 @@ public class WorkloadService {
         boolean candidateSlips = after.schedules().stream()
                 .anyMatch(ts -> ts.taskId().equals(CANDIDATE_TASK_ID) && ts.willSlip());
 
-        // Volume axis: backlog (workdays) before / after adding the candidate's effort.
         BigDecimal backlogHoursBefore = existing.stream()
                 .map(ScheduledTask::remaining).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal candidateHours = estimatedHours != null ? estimatedHours : BigDecimal.ZERO;
@@ -621,8 +548,6 @@ public class WorkloadService {
                 })
                 .count();
     }
-
-    // ─── private mapping ──────────────────────────────────────────────────────
 
     private MemberWorkloadResponse toMemberResponse(User user, MemberLoad ml,
                                                     List<ProjectAllocationItem> projectItems,

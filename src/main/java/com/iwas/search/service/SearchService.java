@@ -34,10 +34,6 @@ public class SearchService {
     private final SearchProperties properties;
     private final ProjectService projectService;
 
-    // -------------------------------------------------------------------------
-    // User
-    // -------------------------------------------------------------------------
-
     public AutocompleteResponse autocomplete(String query, Long projectId, Long excludeProjectId, UserRole role) {
         long start = System.currentTimeMillis();
         String prefix = normalize(query);
@@ -77,8 +73,6 @@ public class SearchService {
                     .tookMs(System.currentTimeMillis() - start).build();
         }
 
-        // Redis cache is keyed by prefix only, so it is used only for the unfiltered (role == null)
-        // case; a role filter bypasses the cache to avoid cross-role result pollution.
         if (role == null) {
             List<SuggestionItem> cached = cache.getSuggestions(ENTITY_USER, prefix);
             if (!cached.isEmpty()) {
@@ -128,9 +122,6 @@ public class SearchService {
         return fallback.searchUsers(request);
     }
 
-    // -------------------------------------------------------------------------
-    // Project
-    // -------------------------------------------------------------------------
 
     public AutocompleteResponse autocompleteProjects(String query) {
         long start = System.currentTimeMillis();
@@ -142,8 +133,6 @@ public class SearchService {
         }
         int topN = properties.getAutocomplete().getMaxSuggestions();
 
-        // Restrict suggestions to projects the current user participates in. A null result
-        // means ADMIN (no restriction); an empty list means the user is in no project.
         List<Long> accessibleIds = projectService.getAccessibleProjectIds();
         if (accessibleIds != null) {
             return autocompleteMyProjects(prefix, topN, accessibleIds, start);
@@ -175,12 +164,6 @@ public class SearchService {
                 .prefix(prefix).suggestions(suggestions).source(source)
                 .tookMs(System.currentTimeMillis() - start).build();
     }
-
-    /**
-     * Autocomplete restricted to the given accessible project IDs. The Redis cache is keyed
-     * by prefix only (shared across users), so it is bypassed here to avoid leaking a user's
-     * projects to others.
-     */
     private AutocompleteResponse autocompleteMyProjects(String prefix, int topN,
                                                         List<Long> accessibleIds, long start) {
         if (accessibleIds.isEmpty()) {
@@ -220,9 +203,6 @@ public class SearchService {
         return fallback.searchProjects(request);
     }
 
-    // -------------------------------------------------------------------------
-    // Shared
-    // -------------------------------------------------------------------------
 
     @Async
     public void warmCacheAsync(String entity, String prefix, List<SuggestionItem> items) {

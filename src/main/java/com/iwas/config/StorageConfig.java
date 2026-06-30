@@ -18,21 +18,18 @@ import java.net.URI;
 @Configuration
 public class StorageConfig {
 
-    /** Bỏ trống => dùng endpoint mặc định của AWS S3. Đặt giá trị => MinIO/R2/B2. */
     @Value("${app.storage.endpoint:}")
     private String endpoint;
 
     @Value("${app.storage.region:us-east-1}")
     private String region;
 
-    /** Bỏ trống => lấy credentials từ default provider chain (IAM instance role trên EC2, env, profile...). */
     @Value("${app.storage.access-key:}")
     private String accessKey;
 
     @Value("${app.storage.secret-key:}")
     private String secretKey;
 
-    /** true cho MinIO (path-style); false cho AWS S3 (virtual-hosted style). */
     @Value("${app.storage.path-style-access:false}")
     private boolean pathStyleAccess;
 
@@ -40,7 +37,6 @@ public class StorageConfig {
         if (StringUtils.hasText(accessKey) && StringUtils.hasText(secretKey)) {
             return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
         }
-        // Không có key tĩnh => IAM role / biến môi trường / ~/.aws/credentials
         return DefaultCredentialsProvider.create();
     }
 

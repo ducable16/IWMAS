@@ -41,10 +41,6 @@ public class DatabaseAdapter implements SearchFallbackService {
     private final SearchProperties properties;
     private final StorageService storageService;
 
-    // -------------------------------------------------------------------------
-    // User
-    // -------------------------------------------------------------------------
-
     @Override
     public SearchResponse<UserSearchResult> searchUsers(SearchRequest request) {
         long start = System.currentTimeMillis();
@@ -144,10 +140,6 @@ public class DatabaseAdapter implements SearchFallbackService {
                 .collect(Collectors.toList());
     }
 
-    // -------------------------------------------------------------------------
-    // Project
-    // -------------------------------------------------------------------------
-
     @Override
     public SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request) {
         long start = System.currentTimeMillis();
@@ -215,10 +207,6 @@ public class DatabaseAdapter implements SearchFallbackService {
                         .build())
                 .collect(Collectors.toList());
     }
-
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
 
     private UserSearchResult toUserResult(User u) {
         return UserSearchResult.builder()

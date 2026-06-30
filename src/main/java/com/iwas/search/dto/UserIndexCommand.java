@@ -5,11 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Input cho việc index user vào search engine (write path).
- * Tách khỏi {@link UserSearchResult} (read path) để tránh nhầm lẫn:
- * ở đây {@code avatarId} là KEY lưu trong storage, KHÔNG phải URL đã resolve.
- */
 @Data
 @Builder
 @NoArgsConstructor

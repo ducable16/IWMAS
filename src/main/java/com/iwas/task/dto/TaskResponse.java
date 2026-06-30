@@ -30,7 +30,7 @@ public class TaskResponse {
     private UserPublicView assignee;
     private UserPublicView reporter;
     private List<TaskSkillRequirementResponse> skillRequirements;
-    private List<TaskCommentResponse> comments;  // only populated on task detail
+    private List<TaskCommentResponse> comments;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

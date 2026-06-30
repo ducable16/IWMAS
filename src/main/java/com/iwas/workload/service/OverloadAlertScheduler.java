@@ -9,12 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Daily overload check for every active user. Computes each member's workload
- * live from the v3 simulation and sends an OVERLOAD_WARNING when their badge is
- * OVERDUE or WILL_SLIP — nothing is persisted. Each evaluateOverload() call is
- * independently transactional, so one user's failure does not affect the others.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

@@ -168,11 +168,6 @@ public class SkillService {
         publishUserSkillSync(userId);
     }
 
-    /**
-     * Re-publishes the user's search document so the {@code skills} nested field stays in
-     * sync with Elasticsearch after an employee-skill change. No-op for inactive/deleted
-     * users (the search index only holds active users).
-     */
     private void publishUserSkillSync(Long userId) {
         userRepository.findById(userId)
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && !Boolean.TRUE.equals(u.getIsDeleted()))

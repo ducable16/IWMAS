@@ -113,10 +113,6 @@ public class TaskCommentService {
         taskCommentRepository.save(comment);
     }
 
-    // -----------------------------------------------------------------------
-    // private helpers
-    // -----------------------------------------------------------------------
-
     private Set<Long> parseMentions(String content) {
         if (content == null || !content.contains("@[uid:")) return Set.of();
         Set<Long> result = new LinkedHashSet<>();

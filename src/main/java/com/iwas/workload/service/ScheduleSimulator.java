@@ -12,61 +12,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Workload v3 engine — single-resource serial scheduling simulation.
- *
- * A member is modelled as one machine with a fixed daily sub-capacity per
- * project lane. Tasks are jobs with remaining effort and a deadline (dueDate).
- * {@code startDate} is informational only — it is NOT a release constraint, so
- * every unfinished task is available from today. The simulation pours capacity,
- * day by day, into the next task in order until it is done, then moves to the
- * next — producing a projected finish date for every task and a per-task slip
- * prediction.
- *
- * Ordering is a *forecasting hint*: {@link #simulate} treats the supplied
- * order as a priority list, not a rigid sequence. It is forward-only and never
- * assumes the order was historically followed — past reality is already baked
- * into each task's remaining hours. A member who works tasks out of order
- * simply produces different remaining values; the next simulation re-projects
- * from those.
- *
- * Pure and stateless: every input is a method argument, every output a record.
- */
 @Component
 public class ScheduleSimulator {
 
     private static final double EPS = 1e-6;
-    /** Hard stop for the forward loop — a task unfinished past this is unschedulable. */
     private static final int MAX_HORIZON_YEARS = 5;
 
-    // ─── input / output records ───────────────────────────────────────────────
-
-    /** A task as seen by the simulator. {@code startDate} is informational only — it does not gate scheduling. */
     public record ScheduledTask(Long taskId, Long projectId, BigDecimal remaining,
                                 LocalDate startDate, LocalDate dueDate, TaskPriority priority) {}
 
-    /** Per-task forecast. {@code projectedFinish} null → could not be scheduled. */
     public record TaskSchedule(Long taskId, LocalDate projectedStart, LocalDate projectedFinish,
                                boolean willSlip, long lateByWorkdays) {}
 
-    /** Per-lane result: per-task forecasts plus the count of tasks that will slip. */
     public record LaneSimulation(List<TaskSchedule> schedules,
                                  int predictedLateTaskCount) {}
-
-    // ─── workday calendar ─────────────────────────────────────────────────────
 
     public static boolean isWorkday(LocalDate d) {
         DayOfWeek dow = d.getDayOfWeek();
         return dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
     }
 
-    /** Inclusive count of Mon–Fri days in [from, to]. 0 when the range is empty. */
     public static long countWorkdays(LocalDate from, LocalDate to) {
         if (from == null || to == null || to.isBefore(from)) return 0;
         return from.datesUntil(to.plusDays(1)).filter(ScheduleSimulator::isWorkday).count();
     }
 
-    /** Adds {@code n} workdays to {@code start} (n=0 returns start unchanged). */
     public static LocalDate addWorkdays(LocalDate start, int n) {
         LocalDate d = start;
         int added = 0;
@@ -89,13 +59,6 @@ public class ScheduleSimulator {
         return n;
     }
 
-    // ─── ordering ──────────────────────────────────────────────────────────────
-
-    /**
-     * Earliest-Due-Date order — system-suggested optimal sequence. Jackson's
-     * rule: on a single machine EDD minimises maximum lateness. Tasks with no
-     * due date sort last; ties broken by priority (CRITICAL first) then id.
-     */
     public static List<ScheduledTask> eddOrder(List<ScheduledTask> tasks) {
         List<ScheduledTask> copy = new ArrayList<>(tasks);
         copy.sort(Comparator
@@ -115,15 +78,6 @@ public class ScheduleSimulator {
         };
     }
 
-    // ─── simulation ────────────────────────────────────────────────────────────
-
-    /**
-     * Runs the forward simulation for one lane.
-     *
-     * @param ordered  tasks in the desired priority order (EDD or member custom)
-     * @param subCapacityPerDay daily capacity of this lane (8h × allocation%)
-     * @param today    forecast start; treated as a full workday
-     */
     public LaneSimulation simulate(List<ScheduledTask> ordered,
                                    BigDecimal subCapacityPerDay, LocalDate today) {
         List<ScheduledTask> workable = new ArrayList<>();
@@ -135,7 +89,6 @@ public class ScheduleSimulator {
 
         List<TaskSchedule> schedules;
         if (subCap <= EPS) {
-            // No capacity in this lane — nothing can be scheduled.
             schedules = new ArrayList<>();
             for (ScheduledTask t : workable) {
                 schedules.add(new TaskSchedule(t.taskId(), null, null,
@@ -161,9 +114,6 @@ public class ScheduleSimulator {
         LocalDate hardStop = today.plusYears(MAX_HORIZON_YEARS);
 
         while (rem.values().stream().anyMatch(h -> h > EPS) && !cursor.isAfter(hardStop)) {
-            // startDate is NOT a release constraint in this domain — a member may work a task
-            // before its planned start. So every unfinished task is available from today; we
-            // simply take the next one in the supplied (ATC / custom) order.
             ScheduledTask next = null;
             for (ScheduledTask t : ordered) {
                 if (rem.get(t.taskId()) > EPS) { next = t; break; }
@@ -190,7 +140,7 @@ public class ScheduleSimulator {
             if (t.dueDate() == null) {
                 willSlip = false;
             } else if (finish == null) {
-                willSlip = true; // unfinished within the horizon
+                willSlip = true;
             } else {
                 willSlip = finish.isAfter(t.dueDate());
                 if (willSlip) lateBy = countWorkdays(t.dueDate().plusDays(1), finish);

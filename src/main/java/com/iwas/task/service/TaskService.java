@@ -157,11 +157,8 @@ public class TaskService {
         Specification<Task> spec = TaskSpecification.fromFilter(filter);
 
         if (filter.getProjectId() != null) {
-            // Search trong một project cụ thể — kiểm tra quyền truy cập
             projectService.requireProjectAccess(filter.getProjectId());
         } else {
-            // Search toàn bộ — chỉ trả task thuộc project user có quyền xem
-            // null = ADMIN, không cần lọc theo project
             List<Long> accessibleIds = projectService.getAccessibleProjectIds();
             if (accessibleIds != null) {
                 if (accessibleIds.isEmpty()) {
@@ -243,7 +240,6 @@ public class TaskService {
         requireTaskEditAccess(task);
         Long actor = authenticatedUserResolver.currentUserId();
 
-        // Snapshot before applyRequest so we can diff into the activity feed.
         String oldTitle = task.getTitle();
         String oldDescription = task.getDescription();
         TaskType oldType = task.getType();
@@ -353,11 +349,6 @@ public class TaskService {
         taskActivityRepository.save(newActivity(id, actor, TaskActivityType.TASK_DELETED, null, null));
     }
 
-    /**
-     * Unified activity/history feed for a task — status, field edits, and
-     * attachment events — in chronological order. Replaces the old
-     * status-only history.
-     */
     public List<TaskActivityResponse> getTaskActivity(Long taskId) {
         Task task = findTask(taskId);
         projectService.requireProjectAccess(task.getProjectId());
@@ -421,8 +412,6 @@ public class TaskService {
                 .toList();
     }
 
-    // --- Validation helpers ---
-
     private void validateAssignee(Long projectId, Long assigneeId) {
         if (assigneeId == null) return;
         if (!projectService.isProjectParticipant(projectId, assigneeId)) {
@@ -455,7 +444,6 @@ public class TaskService {
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_ASSIGNEE_SKILL_NOT_MET));
     }
 
-    // --- Access control helpers ---
 
     private void requireTaskEditAccess(Task task) {
         Long userId = authenticatedUserResolver.currentUserId();
@@ -466,19 +454,12 @@ public class TaskService {
         }
     }
 
-    /**
-     * Returns a spec restricted to the current user's accessible projects.
-     * Returns null when the user has no accessible projects (empty result).
-     * Returns the original spec unchanged when the user is ADMIN.
-     */
     private Specification<Task> applyAccessFilter(Specification<Task> spec) {
         List<Long> accessibleIds = projectService.getAccessibleProjectIds();
         if (accessibleIds == null) return spec;
         if (accessibleIds.isEmpty()) return null;
         return spec.and((root, query, cb) -> root.get("projectId").in(accessibleIds));
     }
-
-    // --- Private helpers ---
 
     private void applyRequest(Task task, TaskRequest request) {
         task.setProjectId(request.getProjectId());
@@ -493,30 +474,14 @@ public class TaskService {
 
     private static final int DEFAULT_HORIZON_WORKDAYS = 10;
 
-    /**
-     * Date resolution rules for workload model v2.1:
-     *  - Both null              → reject (TASK_DATES_REQUIRED).
-     *  - Only dueDate set       → startDate stays null (no planned start; the
-     *                             arrangement engine projects one as output, and
-     *                             the workload simulator treats null start as
-     *                             "released today").
-     *  - Only startDate set:
-     *      • with estimate      → default dueDate = startDate + ceil(estimated) workdays − 1
-     *                             (drip ~1h/day for open-ended tasks).
-     *      • estimate null      → default dueDate = startDate + DEFAULT_HORIZON_WORKDAYS − 1
-     *                             (placeholder; task contributes 0 to load until estimate is set
-     *                             — counted as unestimatedTaskCount instead).
-     *  - Both set               → validate start <= due, store as-is.
-     */
     private void resolveAndApplyDates(Task task, LocalDate requestedStart, LocalDate requestedDue) {
         if (requestedStart == null && requestedDue == null) {
             throw new AppException(ErrorCode.TASK_DATES_REQUIRED);
         }
 
-        LocalDate start = requestedStart; // optional — kept null when not provided
+        LocalDate start = requestedStart;
         LocalDate due = requestedDue;
         if (due == null) {
-            // start is guaranteed non-null here (both-null already rejected above)
             int wd;
             BigDecimal estimated = task.getEstimatedHours();
             if (estimated != null && estimated.signum() > 0) {
@@ -556,9 +521,6 @@ public class TaskService {
                 .filter(t -> !Boolean.TRUE.equals(t.getIsDeleted()))
                 .orElseThrow(() -> new AppException(ErrorCode.TASK_NOT_FOUND));
     }
-
-    // --- Activity-feed helpers ---
-
     private TaskActivity newActivity(Long taskId, Long actorId, TaskActivityType action,
                                      String oldValue, String newValue) {
         TaskActivity a = new TaskActivity();
@@ -570,14 +532,12 @@ public class TaskService {
         return a;
     }
 
-    /** Appends a change entry only when the value actually changed. */
     private void addChange(List<TaskActivity> buf, Long taskId, Long actorId,
                            TaskActivityType action, Object oldVal, Object newVal) {
         if (Objects.equals(oldVal, newVal)) return;
         buf.add(newActivity(taskId, actorId, action, str(oldVal), str(newVal)));
     }
 
-    /** Estimate uses BigDecimal.compareTo so 2.0 and 2.00 are not reported as a change. */
     private void addEstimateChange(List<TaskActivity> buf, Long taskId, Long actorId,
                                    BigDecimal oldVal, BigDecimal newVal) {
         boolean changed = (oldVal == null) != (newVal == null)

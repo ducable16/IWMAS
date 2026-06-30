@@ -16,6 +16,5 @@ public class UpdateUserRequest {
     @Size(max = 100)
     private String position;
 
-    /** Only ADMIN may change role. HR requests with this field set will be rejected. */
     private UserRole role;
 }

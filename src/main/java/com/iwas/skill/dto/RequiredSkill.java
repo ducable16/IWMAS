@@ -23,14 +23,6 @@ public class RequiredSkill {
     private Long skillId;
     private SkillLevel minLevel;
 
-    /**
-     * Parses the compact {@code requiredSkills} query param,
-     * e.g. {@code "12:ADVANCED,5:INTERMEDIATE,7"}. Each item is
-     * {@code skillId[:minLevel]}; the level part is optional. Duplicate skill ids
-     * keep the last occurrence. Returns an empty list for {@code null}/blank input.
-     *
-     * @throws AppException SEARCH_INVALID_SKILL_FILTER on malformed items
-     */
     public static List<RequiredSkill> parse(String raw) {
         if (raw == null || raw.isBlank()) {
             return List.of();
@@ -63,10 +55,6 @@ public class RequiredSkill {
         return new ArrayList<>(bySkillId.values());
     }
 
-    /**
-     * The set of skill levels that satisfy this constraint (levels {@code >= minLevel}).
-     * A {@code null} {@code minLevel} accepts every level.
-     */
     public List<SkillLevel> acceptedLevels() {
         List<SkillLevel> levels = new ArrayList<>();
         for (SkillLevel level : SkillLevel.values()) {
@@ -77,7 +65,6 @@ public class RequiredSkill {
         return levels;
     }
 
-    /** Minimum acceptable level rank (ordinal); 0 when no level constraint. */
     public int minLevelRank() {
         return minLevel == null ? 0 : minLevel.ordinal();
     }

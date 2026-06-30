@@ -25,10 +25,6 @@ public class SearchController {
 
     private final SearchService searchService;
 
-    // -------------------------------------------------------------------------
-    // User
-    // -------------------------------------------------------------------------
-
     @GetMapping("/autocomplete")
     public AutocompleteResponse autocomplete(
             @RequestParam("q") @NotBlank String q,
@@ -54,10 +50,6 @@ public class SearchController {
                 .page(page).size(size).sortBy(sortBy).sortDir(sortDir).build();
         return searchService.search(req);
     }
-
-    // -------------------------------------------------------------------------
-    // Project
-    // -------------------------------------------------------------------------
 
     @GetMapping("/autocomplete/projects")
     public AutocompleteResponse autocompleteProjects(@RequestParam("q") @NotBlank String q) {

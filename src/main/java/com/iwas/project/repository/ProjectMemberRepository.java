@@ -13,28 +13,15 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.projectId = :projectId")
     List<ProjectMember> findByProjectId(Long projectId);
 
-    // "Active" = not soft-deleted and not yet left. A null leaveDate means "stays until the project
-    // completes"; a leaveDate set in the future means still active up to and including that day.
-    // Hence leaveDate IS NULL OR leaveDate >= CURRENT_DATE — a member with a future leaveDate must
-    // not be treated as already gone.
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.projectId = :projectId AND (pm.leaveDate IS NULL OR pm.leaveDate >= CURRENT_DATE)")
     List<ProjectMember> findActiveMembersByProjectId(Long projectId);
 
-    // Active members across a set of projects in one query (same "active" semantics as
-    // findActiveMembersByProjectId). Used to gather the distinct participants of all projects a
-    // PM manages without an N+1 per-project fan-out.
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.projectId IN :projectIds AND (pm.leaveDate IS NULL OR pm.leaveDate >= CURRENT_DATE)")
     List<ProjectMember> findActiveMembersByProjectIdIn(@Param("projectIds") List<Long> projectIds);
 
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.userId = :userId AND (pm.leaveDate IS NULL OR pm.leaveDate >= CURRENT_DATE)")
     List<ProjectMember> findActiveProjectsByUserId(Long userId);
 
-    /**
-     * All non-deleted memberships of a user, regardless of leaveDate. Used by capacity
-     * calculations that bound each allocation by its own join/leave window — a membership
-     * with a future leaveDate is still consuming capacity until then, so it must not be
-     * filtered out the way {@link #findActiveProjectsByUserId} does.
-     */
     @Query("SELECT pm FROM ProjectMember pm WHERE pm.isDeleted = false AND pm.userId = :userId")
     List<ProjectMember> findByUserIdAndIsDeletedFalse(Long userId);
 

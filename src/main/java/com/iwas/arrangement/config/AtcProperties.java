@@ -15,9 +15,6 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "app.arrangement")
 public class AtcProperties {
 
-    /**
-     * slides between value-bias (large k → WSPT) and urgency-bias (small k → EDD). Reasonable range 0.5–4.5.
-     */
     private double k = 2.0;
 
     private TaskPriority priorityFallback = TaskPriority.LOW;

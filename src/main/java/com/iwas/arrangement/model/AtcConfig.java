@@ -44,18 +44,12 @@ public class AtcConfig {
         return priorityFallback;
     }
 
-    /**
-     * Returns a copy with the supplied overrides applied. Null arguments leave
-     * the corresponding parameter unchanged; weight overrides are merged on top
-     * of the existing table (only the supplied priorities change).
-     */
     public AtcConfig withOverrides(Double kOverride, Map<TaskPriority, Double> weightOverrides) {
         Map<TaskPriority, Double> merged = new EnumMap<>(weights);
         if (weightOverrides != null) merged.putAll(weightOverrides);
         return new AtcConfig(merged, kOverride != null ? kOverride : k, priorityFallback);
     }
 
-    /** Weight {@code wⱼ} for a priority, falling back to {@link #priorityFallback}. */
     public double weightOf(TaskPriority priority) {
         Double w = priority != null ? weights.get(priority) : null;
         if (w != null) return w;

@@ -42,9 +42,6 @@ public class ElasticsearchAdapter implements ElasticsearchService {
     private final StorageService storageService;
     private final EmployeeSkillRepository employeeSkillRepository;
 
-    // -------------------------------------------------------------------------
-    // User
-    // -------------------------------------------------------------------------
 
     @Override
     public SearchResponse<UserSearchResult> searchUsers(SearchRequest request) {
@@ -183,10 +180,6 @@ public class ElasticsearchAdapter implements ElasticsearchService {
         userSearchRepository.save(doc);
     }
 
-    /**
-     * Builds a nested filter requiring the user to own {@code rs.skillId} at a level
-     * within {@code rs.acceptedLevels()} (i.e. {@code >= minLevel}).
-     */
     private Query skillFilter(RequiredSkill rs) {
         List<FieldValue> acceptedRanks = rs.acceptedLevels().stream()
                 .map(level -> FieldValue.of((long) level.ordinal()))
@@ -204,9 +197,6 @@ public class ElasticsearchAdapter implements ElasticsearchService {
         userSearchRepository.deleteById(userId);
     }
 
-    // -------------------------------------------------------------------------
-    // Project
-    // -------------------------------------------------------------------------
 
     @Override
     public SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request) {
@@ -321,9 +311,6 @@ public class ElasticsearchAdapter implements ElasticsearchService {
         projectSearchRepository.deleteById(projectId);
     }
 
-    // -------------------------------------------------------------------------
-    // Health
-    // -------------------------------------------------------------------------
 
     @Override
     public boolean isHealthy() {
@@ -336,9 +323,6 @@ public class ElasticsearchAdapter implements ElasticsearchService {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
 
     private UserSearchResult toUserResult(UserSearchDocument doc) {
         return UserSearchResult.builder()

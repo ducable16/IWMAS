@@ -7,10 +7,6 @@ import lombok.Getter;
 
 import java.util.List;
 
-/**
- * Project-scoped member workload — all metrics are computed for a single project lane,
- * not aggregated across the member's full portfolio.
- */
 @Getter
 @Builder
 public class ProjectMemberWorkloadResponse {
@@ -18,7 +14,6 @@ public class ProjectMemberWorkloadResponse {
     private String userFullName;
     private String email;
 
-    /** Allocation and load metrics for this project's lane. */
     private ProjectAllocationItem projectAllocation;
 
     private Integer activeTaskCount;

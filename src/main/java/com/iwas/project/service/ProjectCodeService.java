@@ -19,7 +19,6 @@ public class ProjectCodeService {
     private final ProjectRepository projectRepository;
     private final ProjectCodeGenerator generator;
 
-    /** Returns a guaranteed-unique code derived from the project name. */
     public ProjectCodeSuggestResponse suggest(String name) {
         String code = findUniqueCode(generator.generate(name));
         return ProjectCodeSuggestResponse.builder()
@@ -37,11 +36,6 @@ public class ProjectCodeService {
         }
     }
 
-    /**
-     * Resolves the final code to save:
-     * - User provided a code → normalize + validate + strict uniqueness check (no auto-suffix).
-     * - No code provided    → auto-generate from name, auto-suffix until unique.
-     */
     public String resolveForCreate(String requestedCode, String projectName) {
         if (requestedCode != null && !requestedCode.isBlank()) {
             String normalized = normalize(requestedCode);
@@ -54,7 +48,6 @@ public class ProjectCodeService {
         return findUniqueCode(generator.generate(projectName));
     }
 
-    /** Finds the first available code starting from base, appending -2, -3, … if needed. */
     private String findUniqueCode(String base) {
         validate(base);
         if (!projectRepository.existsByCodeIgnoreCase(base)) {

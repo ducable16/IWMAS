@@ -18,18 +18,12 @@ import java.util.List;
 @AllArgsConstructor
 public class SearchRequest {
 
-    /**
-     * Free-text query. Optional when {@link #requiredSkills} is present — a skill-only
-     * search matches every active user owning the required skills.
-     */
     @Size(max = 200)
     private String query;
 
-    /** Skill constraints; the user must satisfy ALL of them (AND). */
     @Default
     private List<RequiredSkill> requiredSkills = List.of();
 
-    /** Optional system-role filter. When set, only users with this {@link UserRole} match. */
     private UserRole role;
 
     @Default

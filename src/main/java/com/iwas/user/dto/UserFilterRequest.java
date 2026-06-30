@@ -6,9 +6,9 @@ import lombok.Data;
 @Data
 public class UserFilterRequest {
 
-    private String search;       // fullName or email (partial, case-insensitive)
+    private String search;
     private UserRole role;
-    private String position;     // partial, case-insensitive
+    private String position;
     private Boolean active;
     private Boolean verified;
 

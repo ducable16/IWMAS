@@ -16,13 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.EnumMap;
 import java.util.Map;
 
-/**
- * Read-only ATC task-arrangement suggestions.
- *
- * <p>The {@code k} and per-priority weight query params let callers override
- * the configured defaults for a single request — used to drive sensitivity
- * analysis without changing application config.
- */
 @RestController
 @RequestMapping("/api/arrangement")
 @RequiredArgsConstructor
@@ -31,7 +24,6 @@ public class TaskArrangementController {
     private final TaskArrangementService arrangementService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    // ─── explicit lane (PM / admin view of any member) ─────────────────────────
 
     @GetMapping("/lanes/{projectId}/{assigneeId}")
     @PreAuthorize("hasRole('PROJECT_MANAGER')")
@@ -51,8 +43,6 @@ public class TaskArrangementController {
                                  @RequestParam(required = false) Double k) {
         return arrangementService.nextTask(projectId, assigneeId, k, null);
     }
-
-    // ─── current member's own lane ─────────────────────────────────────────────
 
     @GetMapping("/me/lanes/{projectId}")
     public ArrangeResponse arrangeMine(@PathVariable Long projectId,

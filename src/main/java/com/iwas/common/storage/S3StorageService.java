@@ -69,8 +69,6 @@ public class S3StorageService implements StorageService {
 
     @Override
     public String getUrl(String key) {
-        // Mọi object (gồm cả avatar) đều trả presigned URL có thời hạn => bucket private hoàn toàn,
-        // không cần tắt Block Public Access. URL được sinh mới mỗi lần đọc (DB/ES chỉ lưu key).
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                 .signatureDuration(Duration.ofMinutes(presignedUrlExpirationMinutes))
                 .getObjectRequest(GetObjectRequest.builder()

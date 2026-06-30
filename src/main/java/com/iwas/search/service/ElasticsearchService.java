@@ -13,14 +13,12 @@ import java.util.Set;
 
 public interface ElasticsearchService {
 
-    // --- User ---
     SearchResponse<UserSearchResult> searchUsers(SearchRequest request);
     List<SuggestionItem> autocompleteUsers(String prefix, int topN, UserRole role);
     List<SuggestionItem> autocompleteUsersExcluding(String prefix, int topN, Set<Long> excludeIds, UserRole role);
     void indexUser(UserIndexCommand command);
     void deleteUser(Long userId);
 
-    // --- Project ---
     SearchResponse<ProjectSearchResult> searchProjects(SearchRequest request);
     List<SuggestionItem> autocompleteProjects(String prefix, int topN);
     List<SuggestionItem> autocompleteProjectsWithin(String prefix, int topN, Set<Long> allowedIds);

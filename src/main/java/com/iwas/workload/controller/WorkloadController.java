@@ -38,8 +38,6 @@ public class WorkloadController {
         return workloadService.getUserWorkloadRealtime(authenticatedUserResolver.currentUserId(), null);
     }
 
-    // ─── what-if scheduling for the current member ────────────────────────────
-
     @GetMapping("/me/schedule")
     public ProjectScheduleResponse getMySchedule(@RequestParam Long projectId) {
         return workloadService.getMySchedule(authenticatedUserResolver.currentUserId(), projectId);

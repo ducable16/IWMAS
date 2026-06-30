@@ -13,8 +13,6 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank
-//    @Size(min = 8, message = "Password must be at least 8 characters")
-//    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$", message = "Password must contain both letters and numbers")
     private String password;
 
     @NotBlank
