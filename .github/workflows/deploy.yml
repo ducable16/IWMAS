@@ -28,22 +28,37 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      - name: Debug EC2 connectivity
+      - name: Debug deploy secrets
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
+          echo "========== DEPLOY CONFIG =========="
+
+          echo "EC2_HOST=$EC2_HOST"
+          echo "EC2_USERNAME=$EC2_USERNAME"
+
+          echo "EC2_SSH_KEY:"
+          if [ -z "$EC2_SSH_KEY" ]; then
+            echo "EMPTY"
+          else
+            echo "SET"
+            echo "Length: ${#EC2_SSH_KEY}"
+            echo "First line: $(printf '%s\n' "$EC2_SSH_KEY" | head -n 1)"
+            echo "Last line: $(printf '%s\n' "$EC2_SSH_KEY" | tail -n 1)"
+          fi
+
+          echo "==================================="
+
+          echo "Resolved EC2 host:"
+          getent ahostsv4 "$EC2_HOST" || true
+
           echo "Runner public IP:"
           curl -s https://checkip.amazonaws.com
 
           echo "Test port 22:"
           nc -vz -w 10 "$EC2_HOST" 22 || true
-
-          echo "Test port 80:"
-          nc -vz -w 10 "$EC2_HOST" 80 || true
-
-          echo "Test port 443:"
-          nc -vz -w 10 "$EC2_HOST" 443 || true
-
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
