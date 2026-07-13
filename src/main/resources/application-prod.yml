@@ -5,10 +5,7 @@
 # vì trên EC2 chúng chạy local/qua docker-compose.slim.yml ở cùng máy.
 # ============================================================================
 app:
-  storage:
-    # KHÔNG đặt endpoint => SDK dùng endpoint mặc định của AWS S3.
-    # KHÔNG đặt access-key/secret-key => lấy từ IAM instance role gắn vào EC2.
-    region: ${AWS_REGION:ap-southeast-1}
-    bucket: ${S3_BUCKET:iwas-files}
-    path-style-access: false
-    presigned-url-expiration-minutes: 60
+  frontend:
+    base-url: https://iwmas.io.vn
+  ws:
+    allowed-origins: https://iwmas.io.vn,https://www.iwmas.io.vn
