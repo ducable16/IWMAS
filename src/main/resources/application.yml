@@ -52,10 +52,6 @@ server:
   port: 9090
 
 app:
-  logging:
-    logstash:
-      host: localhost
-      port: 5000
   mail:
     from: toilaatmin@gmail.com
   rabbitmq:

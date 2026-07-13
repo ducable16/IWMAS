@@ -55,7 +55,9 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      test:
+        - CMD-SHELL
+        - curl -fs http://localhost:9200/_cluster/health || exit 1
       interval: 10s
       timeout: 5s
       retries: 12
@@ -64,48 +66,6 @@ services:
       driver: json-file
       options:
         max-size: "50m"
-        max-file: "3"
-    restart: unless-stopped
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.13.4
-    container_name: kibana
-    ports:
-      - "5601:5601"
-    environment:
-      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
-    mem_limit: 768m
-    cpus: 0.35
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "30m"
-        max-file: "3"
-    restart: unless-stopped
-
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.13.4
-    container_name: logstash
-    ports:
-      - "5044:5044"
-      - "5000:5000"
-    environment:
-      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
-      PIPELINE_WORKERS: "1"
-    mem_limit: 512m
-    cpus: 0.5
-    volumes:
-      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "30m"
         max-file: "3"
     restart: unless-stopped
 
