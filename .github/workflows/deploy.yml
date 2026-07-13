@@ -28,6 +28,19 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
+      - name: Debug EC2 connectivity
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          echo "Runner public IP:"
+          curl -s https://checkip.amazonaws.com
+
+          echo "Resolve EC2 host:"
+          getent ahostsv4 "$EC2_HOST" || true
+
+          echo "Test port 22:"
+          nc -vz -w 10 "$EC2_HOST" 22
+
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
