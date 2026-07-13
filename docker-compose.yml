@@ -3,13 +3,20 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # Management UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
+    mem_limit: 384m
+    cpus: 0.25
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
 
   redis:
@@ -17,17 +24,32 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
+    command:
+      - redis-server
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - allkeys-lru
+    mem_limit: 192m
+    cpus: 0.15
     volumes:
       - redis_data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: elasticsearch
     environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false   # disable auth for local dev
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    mem_limit: 1g
+    cpus: 0.75
     ports:
       - "9200:9200"
     volumes:
@@ -38,6 +60,11 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
     restart: unless-stopped
 
   kibana:
@@ -46,37 +73,61 @@ services:
     ports:
       - "5601:5601"
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+    mem_limit: 768m
+    cpus: 0.35
     depends_on:
       elasticsearch:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "3"
     restart: unless-stopped
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.13.4
     container_name: logstash
     ports:
-      - "5044:5044"   # beats input (optional)
-      - "5000:5000"   # tcp input (optional)
+      - "5044:5044"
+      - "5000:5000"
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+      PIPELINE_WORKERS: "1"
+    mem_limit: 512m
+    cpus: 0.5
     volumes:
-      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
     depends_on:
       elasticsearch:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "3"
     restart: unless-stopped
 
   minio:
     image: minio/minio
     container_name: minio
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web Console
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+    mem_limit: 512m
+    cpus: 0.25
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
 
 volumes:
