@@ -48,10 +48,27 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3001", "http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"));
+
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "https://iwmas.io.vn",
+                "https://www.iwmas.io.vn",
+                "https://iwas-fe.vercel.app"
+        ));
+
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"
+        ));
+
         config.setAllowedHeaders(List.of("*"));
+
+        config.setExposedHeaders(List.of(
+                "Authorization"
+        ));
+
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
