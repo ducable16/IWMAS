@@ -8,4 +8,8 @@ app:
   frontend:
     base-url: https://iwmas.io.vn
   ws:
-    allowed-origins: https://iwmas.io.vn,https://www.iwmas.io.vn
+    endpoint: /ws
+    allowed-origins: https://iwmas.io.vn,https://www.iwmas.io.vn,https://iwas-fe.vercel.app
+    heartbeat:
+      incoming-ms: 10000
+      outgoing-ms: 10000
