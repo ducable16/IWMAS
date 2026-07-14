@@ -86,13 +86,12 @@ app:
       incoming-ms: 10000
       outgoing-ms: 10000
   storage:
-    # Dev mặc định dùng MinIO (S3-compatible). Prod chuyển sang AWS S3 ở application-prod.yml.
     endpoint: http://localhost:9000
     access-key: minioadmin
     secret-key: minioadmin
     bucket: iwas
     region: us-east-1
-    path-style-access: true               # MinIO bắt buộc path-style
+    path-style-access: true
   jwt:
     secret: hs5p8JHcpEdoZeiE5uRIDCev4rMczXRP
     access-expiration-ms: 3600000

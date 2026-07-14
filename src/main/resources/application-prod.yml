@@ -6,10 +6,17 @@
 # ============================================================================
 app:
   frontend:
-    base-url: https://iwmas.io.vn
+    base-url: https://www.iwmas.io.vn
   ws:
     endpoint: /ws
     allowed-origins: https://iwmas.io.vn,https://www.iwmas.io.vn,https://iwas-fe.vercel.app
     heartbeat:
       incoming-ms: 10000
       outgoing-ms: 10000
+  storage:
+    endpoint: https://storage.ducable.id.vn
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: iwas
+    region: us-east-1
+    path-style-access: true
